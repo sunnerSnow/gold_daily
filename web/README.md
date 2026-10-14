@@ -170,8 +170,8 @@ pg_net 預設逾時只有 2 秒，`cron.sql` 已改成 30 秒。每 15 分鐘的
 
 ## 部署（Vercel）
 
-1. 把 repo 匯入 Vercel，Root Directory 設為 `gold-daily/web`。
-2. 在 Vercel 專案設定填環境變數（見 `.env.example`）：`SUPABASE_URL`、`SUPABASE_SERVICE_ROLE_KEY`、`LINE_CHANNEL_ACCESS_TOKEN`、`LINE_USER_ID`、`GOLD_PRICE_PROVIDER=goldapi`、`GOLD_PRICE_API_KEY`、`CRON_SECRET`、`ADMIN_PASSWORD`、`SESSION_SECRET`、`NEXT_PUBLIC_APP_URL`。
+1. 把 repo 匯入 Vercel，Root Directory 設為 `web`。`vercel.json` 已把函式地區設在東京（`hnd1`），跟 Supabase 同一區，避免每次查資料庫都跨太平洋。
+2. 在 Vercel 專案設定填環境變數（見 `.env.example`）：`SUPABASE_URL`、`SUPABASE_SERVICE_ROLE_KEY`、`LINE_CHANNEL_ACCESS_TOKEN`、`LINE_USER_ID`、`GOLD_PRICE_PROVIDER=goldapi`、`GOLD_PRICE_API_KEY`、`CRON_SECRET`、`ADMIN_PASSWORD`、`SESSION_SECRET`（`NEXT_PUBLIC_APP_URL` 目前用不到，可以不填）。秘密類的值請存成 Secret／Sensitive。
 3. 部署後照〈排程〉設定 pg_cron。
 4. 打開系統狀態頁確認：行情來源、排程最後呼叫時間、LINE 已設定、額度同步成功、設定檢查沒有問題。
 

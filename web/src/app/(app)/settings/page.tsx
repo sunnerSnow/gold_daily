@@ -15,7 +15,7 @@ import { hasIntradayChecks } from '@/lib/schedule';
 import { UNIT_LABEL } from '@/lib/gold/types';
 import { isStale } from '@/lib/gold/validate';
 import { formatDailyMessage } from '@/lib/line/messages';
-import { buildDeps } from '@/lib/server';
+import { getPageDeps } from '@/lib/server';
 import { formatTaipei, taipeiDate } from '@/lib/time';
 import { loadDashboard } from '@/lib/view/dashboard';
 
@@ -25,7 +25,7 @@ export const dynamic = 'force-dynamic';
 const BASIS_SOURCE = { first_valid_of_day: '當日首筆有效報價', previous_close: '前一交易日每日快照', manual: '手動輸入' } as const;
 
 export default async function SettingsPage() {
-  const deps = await buildDeps();
+  const deps = await getPageDeps();
   const env = getEnv();
   const envStatus = checkEnv(env);
   const data = await loadDashboard(deps);

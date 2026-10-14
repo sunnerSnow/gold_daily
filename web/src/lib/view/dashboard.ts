@@ -58,18 +58,34 @@ export async function loadDashboard(deps: JobDeps): Promise<DashboardData> {
   const { store } = deps;
   const now = deps.now();
   const provider = deps.provider.getProviderStatus();
-  const settings = await store.getSettings();
   const instrument: InstrumentKey | null = provider.instrument ? { source: deps.provider.id, ...provider.instrument } : null;
+  const from = taipeiDate(new Date(now.getTime() - 90 * 86_400_000));
 
-  const latest = instrument ? await store.getLatestSnapshot(instrument) : null;
+  // 第一批：彼此獨立的查詢一起送出（資料庫在遠端時，逐一查詢會很慢）
+  const [settings, latest, historyRows, lastDailyRun, lastIntradayRun, lastPush, alerts, latestSync, localSent, allTargets] = await Promise.all([
+    store.getSettings(),
+    instrument ? store.getLatestSnapshot(instrument) : Promise.resolve(null),
+    instrument ? store.listDailySnapshots({ instrument, from }).then((r) => r.rows) : Promise.resolve([]),
+    store.getLastJobRun('daily'),
+    store.getLastJobRun('intraday'),
+    store.getLastEvent(['daily', 'alert_up', 'alert_down', 'target', 'test'], ['sent', 'failed', 'sending']),
+    store.listEvents({ types: ['alert_up', 'alert_down', 'target'], limit: 5 }),
+    store.getLatestQuotaSync({ successOnly: true }),
+    store.countSentSince(startOfLineBillingMonth(now)),
+    store.listPriceTargets({ limit: 50 }),
+  ]);
+
+  // 第二批：需要第一批結果的查詢
   const stale = latest ? isStale(latest.quoteTimestamp, now, provider.staleAfterMinutes) : false;
-  // 「今日漲跌」= 最新報價 vs 最新報價那天之前的有效交易日
-  const reference = instrument && latest ? await store.getPreviousDailySnapshot(instrument, taipeiDate(latest.quoteTimestamp)) : null;
+  const [reference, providerBudget] = await Promise.all([
+    // 「今日漲跌」= 最新報價 vs 最新報價那天之前的有效交易日
+    instrument && latest ? store.getPreviousDailySnapshot(instrument, taipeiDate(latest.quoteTimestamp)) : Promise.resolve(null),
+    getProviderBudget(deps, settings),
+  ]);
   const change = computeChange(latest?.price, reference?.price);
 
-  const from = taipeiDate(new Date(now.getTime() - 90 * 86_400_000));
   const history = instrument
-    ? (await store.listDailySnapshots({ instrument, from })).rows
+    ? historyRows
         .filter((r) => r.currency === instrument.currency && r.unit === instrument.unit)
         .map((r) => ({ date: r.dailyDate!, price: r.price }))
         .reverse()
@@ -97,14 +113,6 @@ export async function loadDashboard(deps: JobDeps): Promise<DashboardData> {
     };
   }
 
-  const [lastDailyRun, lastIntradayRun, lastPush, alerts, latestSync, localSent] = await Promise.all([
-    store.getLastJobRun('daily'),
-    store.getLastJobRun('intraday'),
-    store.getLastEvent(['daily', 'alert_up', 'alert_down', 'test'], ['sent', 'failed', 'sending']),
-    store.listEvents({ types: ['alert_up', 'alert_down', 'target'], limit: 5 }),
-    store.getLatestQuotaSync({ successOnly: true }),
-    store.countSentSince(startOfLineBillingMonth(now)),
-  ]);
   const lastRun = [lastDailyRun, lastIntradayRun]
     .filter((r): r is JobRunRow => r !== null)
     .sort((a, b) => b.startedAt.getTime() - a.startedAt.getTime())[0] ?? null;
@@ -112,10 +120,8 @@ export async function loadDashboard(deps: JobDeps): Promise<DashboardData> {
   const nextIntradayAt = nextCheckAt(settings, now, lastIntradayRun?.startedAt ?? null);
   const sameInst = (t: PriceTargetRow) =>
     instrument !== null && t.source === instrument.source && t.symbol === instrument.symbol && t.currency === instrument.currency && t.unit === instrument.unit;
-  const allTargets = await store.listPriceTargets({ limit: 50 });
   const targets = allTargets.filter((t) => t.status === 'active' && sameInst(t)).sort((a, b) => a.targetPrice - b.targetPrice);
   const targetHistory = allTargets.filter((t) => t.status !== 'active').slice(0, 5);
-  const providerBudget = await getProviderBudget(deps, settings);
 
   return {
     now,

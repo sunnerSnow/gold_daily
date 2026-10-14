@@ -8,7 +8,7 @@ import { checkEnv, getEnv } from '@/lib/env';
 import { MAX_TOTAL_ATTEMPTS, RECOVERABLE_SKIPS, RETRY_WINDOW_MS } from '@/lib/jobs/notify';
 import { REFERENCE_CHART_URL } from '@/lib/line/messages';
 import { estimateMonthlyCalls, hasIntradayChecks } from '@/lib/schedule';
-import { buildDeps } from '@/lib/server';
+import { getPageDeps } from '@/lib/server';
 import type { EventRow, JobType } from '@/lib/store/types';
 import { formatAge, formatTaipei, formatTaipeiTime } from '@/lib/time';
 import { loadDashboard } from '@/lib/view/dashboard';
@@ -25,7 +25,7 @@ function canRetry(e: EventRow, now: Date) {
 }
 
 export default async function StatusPage({ searchParams }: { searchParams: Promise<{ job?: string }> }) {
-  const deps = await buildDeps();
+  const deps = await getPageDeps();
   const env = getEnv();
   const envStatus = checkEnv(env);
   const data = await loadDashboard(deps);

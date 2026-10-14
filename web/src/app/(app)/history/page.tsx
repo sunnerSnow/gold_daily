@@ -3,7 +3,7 @@ import Link from 'next/link';
 import { PageHead } from '@/components/site-chrome';
 import { formatPercent, formatPrice, formatSigned } from '@/lib/gold/math';
 import { UNIT_LABEL } from '@/lib/gold/types';
-import { buildDeps } from '@/lib/server';
+import { getPageDeps } from '@/lib/server';
 import { formatDateLabel, formatTaipei } from '@/lib/time';
 import { loadHistory, parseHistoryQuery, type HistoryQuery } from '@/lib/view/history';
 
@@ -16,7 +16,7 @@ function href(q: HistoryQuery, page: number) {
 }
 
 export default async function HistoryPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
-  const deps = await buildDeps();
+  const deps = await getPageDeps();
   const q = parseHistoryQuery(await searchParams, deps.now());
   const data = await loadHistory(deps, q);
   const inst = data.provider.instrument;

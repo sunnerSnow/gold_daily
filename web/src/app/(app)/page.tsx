@@ -9,7 +9,7 @@ import { checkEnv, getEnv } from '@/lib/env';
 import { formatPercent, formatPrice, formatSigned } from '@/lib/gold/math';
 import { UNIT_LABEL } from '@/lib/gold/types';
 import { REFERENCE_CHART_URL } from '@/lib/line/messages';
-import { buildDeps } from '@/lib/server';
+import { getPageDeps } from '@/lib/server';
 import { formatAge, formatTaipei, formatTaipeiTime, taipeiDate } from '@/lib/time';
 import { loadDashboard, type DashboardData } from '@/lib/view/dashboard';
 
@@ -19,7 +19,7 @@ export const dynamic = 'force-dynamic';
 const BASIS_LABEL = { first_valid_of_day: '當日首筆有效報價', previous_close: '前一交易日參考價', manual: '手動指定' } as const;
 
 export default async function DashboardPage() {
-  const data = await loadDashboard(await buildDeps());
+  const data = await loadDashboard(await getPageDeps());
   if (!data.latest) return <FirstRun data={data} />;
   return <Dashboard data={data} />;
 }

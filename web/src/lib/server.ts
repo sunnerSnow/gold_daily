@@ -1,6 +1,7 @@
 import 'server-only';
 import { randomUUID } from 'node:crypto';
 import { cookies } from 'next/headers';
+import { cache } from 'react';
 import { authMode, SESSION_COOKIE, verifySessionToken } from './auth/session';
 import { checkEnv, getEnv } from './env';
 import { createProvider } from './gold/registry';
@@ -32,6 +33,9 @@ export async function buildDeps(): Promise<JobDeps> {
     newId: () => randomUUID(),
   };
 }
+
+/** 頁面專用：同一次頁面渲染（layout＋page）只建立一次依賴，少查一次資料庫 */
+export const getPageDeps = cache(buildDeps);
 
 /** 目前的請求是否有管理權限（Server Action 一定要再檢查一次，不能只靠 proxy） */
 export async function isAdmin(): Promise<boolean> {

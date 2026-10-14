@@ -1,11 +1,11 @@
 import { NoticeBands, SiteFooter, SiteHeader } from '@/components/site-chrome';
-import { buildDeps } from '@/lib/server';
+import { getPageDeps } from '@/lib/server';
 import { loadChrome } from '@/lib/view/chrome';
 
 export const dynamic = 'force-dynamic';
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
-  const chrome = await loadChrome(await buildDeps());
+  const chrome = await loadChrome(await getPageDeps());
   return (
     <div className="app-shell">
       <NoticeBands chrome={chrome} />
