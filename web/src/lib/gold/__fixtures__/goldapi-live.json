@@ -1,0 +1,52 @@
+{
+  "timestamp": 1791953856,
+  "datetime": "2026-10-14T04:57:36Z",
+  "metal": "XAU",
+  "currency": "USD",
+  "exchange": "FOREXCOM",
+  "symbol": "FOREXCOM:XAUUSD",
+  "open_time": 1791936000,
+  "open_price": 4161.029,
+  "prev_close_price": 4161.03,
+  "low_price": 4144.524,
+  "high_price": 4170.51,
+  "price": 4166.16,
+  "unit": "troy_ounce",
+  "change": 5.13,
+  "change_percent": 0.12,
+  "ask": 4166.46,
+  "bid": 4165.85,
+  "spread": {
+    "value": 0.61,
+    "percentage": 0.0146
+  },
+  "range": {
+    "value": 25.986,
+    "percentage": 0.6245
+  },
+  "price_per_unit": {
+    "troy_ounce": 4166.16,
+    "avoirdupois_ounce": 3797.2813,
+    "gram": 133.9452,
+    "kilogram": 133945.1543,
+    "grain": 8.6795,
+    "pennyweight": 208.308,
+    "tola": 1562.31,
+    "tael": 5063.0417,
+    "baht": 2041.8599
+  },
+  "melt_price_per_gram": {
+    "24k": 133.9452,
+    "23k": 128.3641,
+    "22k": 122.7831,
+    "21k": 117.202,
+    "20k": 111.621,
+    "18k": 100.4589,
+    "16k": 89.2968,
+    "14k": 78.1347,
+    "12k": 66.9726,
+    "10k": 55.8105,
+    "9k": 50.2294,
+    "8k": 44.6484
+  }
+}

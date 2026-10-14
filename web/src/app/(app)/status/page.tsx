@@ -55,7 +55,8 @@ export default async function StatusPage({ searchParams }: { searchParams: Promi
     provider.id === 'goldapi' && provider.configured
       ? [
           '商品：XAU/USD 現貨，單位 USD／金衡盎司（GoldAPI 上游為 FOREXCOM:XAUUSD；Truney 圖表來自 OANDA／TradingView，數字可能有小差異）',
-          '單位：回應有每公克熔金價時，系統會自動交叉核對是否為每金衡盎司',
+          '價格與單位：買價與賣價的中價、每金衡盎司（2026-10-14 實測確認；系統每次都會核對回應的 unit 與每公克價格）',
+          '歷史資料：週末沿用週五價格的資料會被排除；每日價格不是收盤價，只用於回填與第一次計算前一交易日',
           '授權：已檢視 GoldAPI 服務條款（2026-08-21 版），在自己的應用程式中使用與顯示資料屬允許範圍；不可轉售、轉發 API 或外流金鑰',
           '延遲報價：GoldAPI 沒有提供延遲標記，畫面顯示「供應商未提供」',
           '免費方案每月 100 次請求，本系統最多使用 90 次並優先保留每日推播',

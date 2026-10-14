@@ -14,7 +14,10 @@ import {
 //   不可轉售或轉發 API、不可外流金鑰、不可用多個帳號規避額度。
 // - 免費方案（Sandbox）每月最多 100 次請求，更新頻率 2 秒；歷史端點一次最多 90 天。
 // - 驗證方式：x-access-token header；金鑰只在伺服器端使用。
-// - 現貨價單位文件沒有明寫，依業界慣例為每金衡盎司；有每公克熔金價時會交叉核對。
+// - 2026-10-14 以真實回應確認（見 __fixtures__）：
+//   - 最新價回應含 "unit": "troy_ounce"，price 是買價（bid）與賣價（ask）的中價；
+//   - 另有 price_per_unit.gram 與 melt_price_per_gram["24k"]，可交叉核對單位；
+//   - 歷史端點的週末會沿用週五價格（休市沒有新報價），寫入前要排除週末。
 
 const BASE = 'https://www.goldapi.io';
 const TIMEOUT_MS = 10_000;
@@ -28,6 +31,8 @@ const liveSchema = z.object({
   price: z.number().finite().positive(),
   symbol: z.string().optional(),
   exchange: z.string().optional(),
+  unit: z.string().optional(),
+  price_per_unit: z.record(z.string(), z.number()).optional(),
   melt_price_per_gram: z.record(z.string(), z.number()).optional(),
   price_gram_24k: z.number().optional(),
 });
@@ -118,8 +123,12 @@ export class GoldApiProvider implements GoldPriceProvider {
     if (d.metal !== this.metal || d.currency !== instrument.currency) {
       throw new ProviderError(`GoldAPI 回傳的商品不符：${d.metal}/${d.currency}`, 'invalid_response');
     }
-    const gram24k = d.price_gram_24k ?? Object.entries(d.melt_price_per_gram ?? {}).find(([k]) => /24/.test(k))?.[1];
-    const unitIssue = checkTroyOunceUnit(d.price, gram24k);
+    // 單位：回應有明寫就以它為準；再用每公克價格交叉核對（兩者都沒有時只靠下面的合理範圍檢查）
+    if (d.unit !== undefined && d.unit !== 'troy_ounce') {
+      throw new ProviderError(`GoldAPI 報價單位是 ${d.unit}，不是每金衡盎司，拒絕寫入`, 'invalid_response');
+    }
+    const gram = d.price_per_unit?.gram ?? d.price_gram_24k ?? Object.entries(d.melt_price_per_gram ?? {}).find(([k]) => /^24/.test(k))?.[1];
+    const unitIssue = checkTroyOunceUnit(d.price, gram);
     if (unitIssue) throw new ProviderError(unitIssue, 'invalid_response');
     if (instrument.currency === 'USD' && (d.price < 300 || d.price > 50_000)) {
       throw new ProviderError(`GoldAPI 價格 ${d.price} 不在每金衡盎司的合理範圍，拒絕寫入`, 'invalid_response');
@@ -148,7 +157,13 @@ export class GoldApiProvider implements GoldPriceProvider {
     if (parsed.data.metal !== this.metal || parsed.data.currency !== instrument.currency) {
       throw new ProviderError('GoldAPI 歷史資料的商品不符', 'invalid_response');
     }
-    return parsed.data.prices.map((p) => ({ date: p.date, price: p.price, timestamp: new Date(`${p.date}T00:00:00Z`) }));
+    // 週末休市，GoldAPI 會沿用週五價格補上週六、週日；那不是交易日資料，排除
+    return parsed.data.prices
+      .filter((p) => {
+        const w = new Date(`${p.date}T00:00:00Z`).getUTCDay();
+        return w !== 0 && w !== 6;
+      })
+      .map((p) => ({ date: p.date, price: p.price, timestamp: new Date(`${p.date}T00:00:00Z`) }));
   }
 
   getProviderStatus(): ProviderStatus {
@@ -166,7 +181,7 @@ export class GoldApiProvider implements GoldPriceProvider {
       notes: issue
         ? [issue]
         : [
-            `XAU/${this.options.instrument.currency} 現貨（GoldAPI 上游為 FOREXCOM:XAUUSD，Truney 圖表為 OANDA／TradingView，數字可能略有差異）。`,
+            `XAU/${this.options.instrument.currency} 現貨，買賣中價，每金衡盎司（GoldAPI 上游為 FOREXCOM:XAUUSD，Truney 圖表為 OANDA／TradingView，數字可能略有差異）。`,
             '免費方案每月 100 次請求；本系統保留 10 次緩衝並優先保留每日推播。',
           ],
     };

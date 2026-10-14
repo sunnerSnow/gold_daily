@@ -205,7 +205,10 @@ Truney 的金價圖（https://www.truney.com/gold-chart ）由 TradingView 提�
 - **免費方案（Sandbox）**：每月最多 100 次請求，報價每 2 秒更新，有每日歷史價格。
 - **端點**：最新價 `GET /api/price/XAU/USD`、歷史 `GET /api/history/XAU/USD?from=&to=`（一次最多 90 天，只算 1 次）；驗證用 `x-access-token` header。
 - **商品**：XAU/USD 現貨，上游為 `FOREXCOM:XAUUSD`。Truney 圖表是 OANDA／TradingView 的 XAUUSD，兩者數字可能有小差異。
-- **單位**：文件沒有明寫現貨價單位；回應有每公克熔金價時，系統會檢查「價格 ÷ 31.1035」是否接近 24K 每公克價，不符就拒絕寫入，另外也檢查價格是否在每盎司的合理範圍。
+- **2026-10-14 實測確認**（真實回應存在 `src/lib/gold/__fixtures__/`，測試用它跑，不會再呼叫 API）：
+  - 最新價回應有 `"unit": "troy_ounce"`，`price` 是買價（bid）與賣價（ask）的中價。系統以 `unit` 為準，再用 `price_per_unit.gram`（＝價格 ÷ 31.1035）交叉核對，不符就拒絕寫入。
+  - 歷史端點在週末會沿用週五的價格；系統寫入前會排除週六、週日。
+  - 歷史端點的「每日價格」不是收盤價（例如 10/13 為 4,182.45，但 10/14 回應的前一收盤是 4,161.03），只用在回填走勢與第一次計算前一交易日；之後的每日快照都是 09:00 的即時報價。
 - **延遲報價**：GoldAPI 沒有提供延遲標記，畫面顯示「供應商未提供」。
 
 ### 查價次數保護（`src/lib/gold/budget.ts`）
