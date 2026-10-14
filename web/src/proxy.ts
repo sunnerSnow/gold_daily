@@ -25,5 +25,6 @@ export async function proxy(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/((?!login|api/cron|_next/static|_next/image|favicon.ico).*)'],
+  // 網站圖示要讓登入頁、加到主畫面時也拿得到，不經過登入檢查
+  matcher: ['/((?!login|api/cron|_next/static|_next/image|favicon.ico|apple-icon).*)'],
 };

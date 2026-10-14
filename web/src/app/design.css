@@ -52,8 +52,6 @@
   --hdot-blue: #4A6FB5;
   --hdot-red: #CC3743;
   --hdot-gray: #8C857C;
-  --logo-fill: #C9971E;
-  --logo-stroke: #7A5A0E;
 
   --accent: #E06329;          /* 品牌橘：只做裝飾與標記，不當文字色 */
   --link: #A4461B;            /* 橘色加深到 4.5:1 以上才能當文字 */
@@ -137,8 +135,6 @@ html[data-theme="classic"] {
   --hdot-blue: #3E6FC4;
   --hdot-red: #C62828;
   --hdot-gray: #8A909C;
-  --logo-fill: #C9971E;
-  --logo-stroke: #7A5A0E;
 
   --hero-a: #DCE3EE;
   --hero-b: #E8ECF2;
@@ -246,8 +242,7 @@ a:hover { color: var(--link-hover); }
   font-family: var(--serif); font-weight: 700; font-size: 21px; letter-spacing: 0.01em;
 }
 .brand:hover { color: var(--header-ink); }
-.brand__fill { fill: var(--logo-fill); }
-.brand__stroke { fill: none; stroke: var(--logo-stroke); stroke-width: 1.6; stroke-linejoin: round; }
+.brand__mark { display: block; width: auto; height: 40px; }
 .nav {
   display: flex; flex-wrap: wrap; gap: 2px; padding: 4px;
   background: var(--nav-bg); border-radius: 999px; box-shadow: var(--shadow);
