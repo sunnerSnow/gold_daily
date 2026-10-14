@@ -8,9 +8,19 @@ const optionalText = z
   .optional()
   .transform((v) => (v && v.trim() !== '' ? v.trim() : undefined));
 
+/** Supabase 後台的 Data API 頁面會顯示 https://xxx.supabase.co/rest/v1/，SDK 只要網域，這裡統一去掉路徑 */
+const supabaseUrl = optionalText.transform((v) => {
+  if (!v) return v;
+  try {
+    return new URL(v).origin;
+  } catch {
+    return v;
+  }
+});
+
 const schema = z.object({
   NEXT_PUBLIC_APP_URL: optionalText,
-  SUPABASE_URL: optionalText,
+  SUPABASE_URL: supabaseUrl,
   SUPABASE_ANON_KEY: optionalText,
   SUPABASE_SERVICE_ROLE_KEY: optionalText,
   LINE_CHANNEL_ACCESS_TOKEN: optionalText,

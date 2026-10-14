@@ -95,6 +95,11 @@ describe('環境變數檢查', () => {
     expect(s.issues).toHaveLength(0);
   });
 
+  it('SUPABASE_URL 多貼了 /rest/v1/ 也能用', () => {
+    expect(readEnv({ SUPABASE_URL: 'https://abc.supabase.co/rest/v1/' }).SUPABASE_URL).toBe('https://abc.supabase.co');
+    expect(readEnv({ SUPABASE_URL: ' https://abc.supabase.co ' }).SUPABASE_URL).toBe('https://abc.supabase.co');
+  });
+
   it('使用 GoldAPI 但沒有金鑰時提示', () => {
     const s = checkEnv(readEnv({ GOLD_PRICE_PROVIDER: 'goldapi' }));
     expect(s.issues.some((i) => i.key === 'GOLD_PRICE_API_KEY')).toBe(true);
