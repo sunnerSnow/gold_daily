@@ -1,0 +1,65 @@
+@import "tailwindcss";
+/* 設計稿的 token 與元件樣式（gold-daily/design/assets/styles.css 的複本，改設計稿時一併同步） */
+@import "./design.css";
+
+/* 讓 Tailwind 工具類別也能用設計 token，例如 text-ink-2、bg-surface */
+@theme inline {
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-ink: var(--ink);
+  --color-ink-2: var(--ink-2);
+  --color-ink-3: var(--ink-3);
+  --color-line: var(--line);
+  --color-up: var(--up);
+  --color-down: var(--down);
+  --font-sans: var(--sans);
+  --font-mono: var(--mono);
+  --font-serif: var(--serif);
+}
+
+/* ---------- 應用程式專用（設計稿沒有的狀態） ---------- */
+
+/* 頂部金色漸層（設計稿的 .top），改成整頁背景，頁首與標題區再套 .on-gold 加深文字 */
+.app-shell {
+  min-height: 100vh;
+  display: flex; flex-direction: column;
+  background: linear-gradient(180deg, var(--hero-a) 0px, var(--hero-b) 360px, var(--bg) 720px) no-repeat, var(--bg);
+}
+.app-shell > main { flex: 1 0 auto; width: 100%; }
+.on-gold { --ink-2: #3A3A3A; --ink-3: #4D4D4D; --eyebrow: #6B2C0F; --link: #6B2C0F; --link-hover: #4A1E0A; }
+
+.band {
+  border-bottom: 1px solid var(--line);
+  background: var(--surface-2);
+  color: var(--ink-2);
+}
+.band__inner {
+  max-width: 1280px; margin: 0 auto; padding: 8px 24px;
+  display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 6px 12px; font-size: 13.5px;
+}
+.band--warn { background: var(--warn-bg); color: var(--warn); border-bottom-color: transparent; }
+
+.flash { border-radius: 10px; padding: 12px 14px; font-size: 14px; }
+.flash--ok { background: var(--ok-bg); color: var(--ok); }
+.flash--err { background: var(--err-bg); color: var(--err); }
+
+.btn--sm { min-height: 36px; padding: 0 14px; font-size: 13px; }
+@media (pointer: coarse) { .btn--sm { min-height: 44px; } }
+
+.action-grid { display: flex; flex-wrap: wrap; gap: 10px; }
+.stack { display: flex; flex-direction: column; gap: 24px; min-width: 0; }
+@media (max-width: 640px) { .stack { gap: 16px; } }
+
+.target-list { display: flex; flex-direction: column; }
+.target-list li { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 16px; padding: 12px 0; border-bottom: 1px solid var(--line-3); }
+.target-list li:last-child { border-bottom: 0; }
+.target-list__price { font-family: var(--mono); font-size: 18px; font-weight: 600; }
+.inline-form { display: inline-flex; }
+
+.login-card { max-width: 420px; margin: 8vh auto 0; }
+
+.text-pre { white-space: pre-line; }
+
+/* 說明文字裡的長路徑、事件鍵（沒有空白可斷行）在手機上要能斷開 */
+.caption, .cell-note, .help, .note, .flash { overflow-wrap: anywhere; }

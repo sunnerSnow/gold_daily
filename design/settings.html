@@ -1,0 +1,321 @@
+<!doctype html>
+<html lang="zh-Hant-TW">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>推播設定・Gold Daily</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Noto+Sans+TC:wght@400;500;700&family=Noto+Serif+TC:wght@600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/styles.css">
+</head>
+<body data-page="settings">
+
+<div class="top top--soft">
+<div class="mock-band">
+  <div class="mock-band__inner">
+    <span class="mock-tag">MOCK</span>
+    <span><b>尚未設定正式行情來源。</b>推播內容目前來自 Mock Provider，訊息裡會標示「模擬資料」。</span>
+  </div>
+</div>
+
+<header class="site-header">
+  <div class="site-header__inner">
+    <a class="brand" href="index.html">
+      <svg width="28" height="28" viewBox="0 0 28 28" aria-hidden="true"><path class="brand__fill" d="M5 21 L8.5 11 H19.5 L23 21 Z"></path><path class="brand__stroke" d="M8.5 11 L10.5 7 H17.5 L19.5 11"></path></svg>
+      Gold Daily
+    </a>
+    <nav class="nav" aria-label="主要導覽">
+      <a href="index.html">儀表板</a>
+      <a href="history.html">歷史資料</a>
+      <a href="settings.html" aria-current="page">推播設定</a>
+      <a href="status.html">系統狀態</a>
+    </nav>
+    <div class="hchips">
+      <span class="hchip hchip--gold"><span class="dot"></span>行情 Mock・有效</span>
+      <span class="hchip hchip--blue"><span class="dot"></span>LINE 已連線</span>
+    </div>
+  </div>
+</header>
+
+  <div class="page-head">
+    <div class="page-head__text">
+      <p class="eyebrow">Settings</p>
+      <h1>推播設定</h1>
+      <p>變更在下一次排程生效・所有時間為台北時間</p>
+    </div>
+  </div>
+</div>
+
+<main class="page">
+
+  <div class="row">
+
+    <form class="col-main" id="settings-form" novalidate>
+
+      <!-- 每日推播 -->
+      <section class="card reveal" aria-labelledby="daily-h">
+        <div class="card-head">
+          <div class="head-stack">
+            <p class="eyebrow">01・Daily</p>
+            <h2 class="card-title" id="daily-h">每日推播</h2>
+          </div>
+          <div class="switch-row">
+            <span class="switch-row__text" id="daily-state">啟用</span>
+            <button type="button" class="switch" role="switch" aria-checked="true" data-default="true" data-text="daily-state" data-controls="daily-fields" aria-labelledby="daily-h"></button>
+          </div>
+        </div>
+        <fieldset class="plain-fieldset" id="daily-fields">
+          <div class="field" style="max-width: 260px">
+            <label for="daily-time">推播時間（台北）</label>
+            <input class="input num" type="time" id="daily-time" name="dailyTime" value="09:00" step="60">
+          </div>
+          <p class="help">排程服務的實際觸發時間可能晚幾分鐘。同一天最多推播一次（事件鍵 <span class="num">daily:YYYY-MM-DD</span>），排程重跑不會重複送出。</p>
+        </fieldset>
+      </section>
+
+      <!-- 價格異動提醒 -->
+      <section class="card reveal" aria-labelledby="alert-h">
+        <div class="card-head">
+          <div class="head-stack">
+            <p class="eyebrow">02・Alerts</p>
+            <h2 class="card-title" id="alert-h">價格異動提醒</h2>
+          </div>
+          <div class="switch-row">
+            <span class="switch-row__text" id="alert-state">啟用</span>
+            <button type="button" class="switch" role="switch" aria-checked="true" data-default="true" data-text="alert-state" data-controls="alert-fields" aria-labelledby="alert-h"></button>
+          </div>
+        </div>
+        <fieldset class="plain-fieldset" id="alert-fields">
+          <div class="field-grid">
+            <div class="field">
+              <label for="rise">上漲門檻</label>
+              <div class="input-affix">
+                <input class="input num" type="number" id="rise" name="rise" value="1" step="0.1" min="0.1" max="20" inputmode="decimal" aria-describedby="rise-error">
+                <span class="input-affix__suffix">%</span>
+              </div>
+              <span class="field-error" id="rise-error"></span>
+            </div>
+            <div class="field">
+              <label for="fall">下跌門檻</label>
+              <div class="input-affix">
+                <input class="input num" type="number" id="fall" name="fall" value="1" step="0.1" min="0.1" max="20" inputmode="decimal" aria-describedby="fall-error">
+                <span class="input-affix__suffix">%</span>
+              </div>
+              <span class="field-error" id="fall-error"></span>
+            </div>
+            <div class="field">
+              <label for="polling">盤中檢查頻率</label>
+              <select class="input" id="polling" name="polling">
+                <option value="15" selected>每 15 分鐘</option>
+                <option value="30">每 30 分鐘</option>
+                <option value="60">每 60 分鐘</option>
+                <option value="daily">不做盤中檢查（只用每日查價）</option>
+              </select>
+            </div>
+            <div class="field">
+              <label for="cooldown">同方向冷卻時間</label>
+              <div class="input-affix">
+                <input class="input num" type="number" id="cooldown" name="cooldown" value="240" step="15" min="15" max="1440" inputmode="numeric" aria-describedby="cooldown-hint cooldown-error">
+                <span class="input-affix__suffix">分鐘</span>
+              </div>
+              <span class="help" id="cooldown-hint">＝ 4 小時</span>
+              <span class="field-error" id="cooldown-error"></span>
+            </div>
+          </div>
+
+          <div class="note" id="note-intraday">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M12 11v6"></path><path d="M12 7.5h.01"></path></svg>
+            <span>盤中檢查需要能每 15 分鐘觸發的排程服務，部署方案的排程限制請見 README。目前外部排程已設定，最近一次觸發 <span class="num">10:30:00</span>。</span>
+          </div>
+          <div class="note note--warn" id="note-daily-only" hidden>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3 2 21h20L12 3z"></path><path d="M12 10v5"></path><path d="M12 18h.01"></path></svg>
+            <span>只用每日查價時，異動提醒只能依每天推播時查到的價格判斷，<b>無法在價格觸及門檻的當下通知。</b></span>
+          </div>
+
+          <fieldset class="plain-fieldset" style="gap: 12px">
+            <legend>參考基準</legend>
+            <div class="radio-list">
+              <label class="radio">
+                <input type="radio" name="baseline" value="first" checked>
+                <span class="radio__title">當日首筆有效報價（預設）</span>
+                <span class="radio__desc">每個交易日第一次取得有效報價時建立，當天不會因為重新查詢而改變。</span>
+              </label>
+              <label class="radio">
+                <input type="radio" name="baseline" value="prev">
+                <span class="radio__title">前一交易日參考價</span>
+                <span class="radio__desc">使用前一個有效交易日的每日快照價格。</span>
+              </label>
+              <label class="radio">
+                <input type="radio" name="baseline" value="manual">
+                <span class="radio__title">手動指定</span>
+                <span class="radio__desc">固定使用你輸入的價格，直到再次修改。</span>
+                <span class="radio__extra">
+                  <span class="input-affix">
+                    <input class="input num" type="number" name="manual" value="4051.20" step="0.01" min="0.01" inputmode="decimal" aria-label="手動基準價格（USD / 金衡盎司）" aria-describedby="manual-error" disabled>
+                    <span class="input-affix__suffix">USD</span>
+                  </span>
+                  <span class="field-error" id="manual-error"></span>
+                </span>
+              </label>
+            </div>
+            <div class="inset" style="display: flex; flex-direction: column; gap: 12px">
+              <dl class="kv-list">
+                <dt>目前基準</dt><dd><span class="num">4,051.20</span> USD / 金衡盎司</dd>
+                <dt>建立時間</dt><dd class="num">2026/10/13 09:00:00</dd>
+                <dt>來源</dt><dd>Mock Provider（每日快照）</dd>
+                <dt>下次重設</dt><dd>下一交易日首筆有效報價</dd>
+              </dl>
+              <div class="btn-row">
+                <button type="button" class="btn" id="reset-baseline">立即重設基準</button>
+                <span class="help">重設會寫入事件紀錄，並以下一筆有效報價作為新基準。</span>
+              </div>
+            </div>
+          </fieldset>
+        </fieldset>
+      </section>
+
+      <!-- LINE 訊息額度 -->
+      <section class="card reveal" aria-labelledby="quota-h">
+        <div class="card-head" style="align-items: flex-end">
+          <div class="head-stack">
+            <p class="eyebrow">03・Quota</p>
+            <h2 class="card-title" id="quota-h">LINE 訊息額度</h2>
+          </div>
+          <a class="lnk" href="status.html#quota">查看本月用量 →</a>
+        </div>
+        <div class="field-grid">
+          <div class="field">
+            <label for="plan">LINE 方案</label>
+            <select class="input" id="plan" name="plan">
+              <option selected>輕用量（免費）</option>
+              <option>中用量</option>
+              <option>高用量</option>
+              <option>其他方案</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="quota">每月訊息額度</label>
+            <div class="input-affix">
+              <input class="input num" type="number" id="quota" name="quota" value="200" step="1" min="1" inputmode="numeric" aria-describedby="quota-help quota-error">
+              <span class="input-affix__suffix">則</span>
+            </div>
+            <span class="help" id="quota-help">依當期方案填寫，系統會再用 LINE 官方用量核對。</span>
+            <span class="field-error" id="quota-error"></span>
+          </div>
+          <div class="field">
+            <label for="buffer">安全緩衝</label>
+            <div class="input-affix">
+              <input class="input num" type="number" id="buffer" name="buffer" value="5" step="1" min="0" max="100" inputmode="numeric" aria-describedby="buffer-error">
+              <span class="input-affix__suffix">則</span>
+            </div>
+            <span class="field-error" id="buffer-error"></span>
+          </div>
+        </div>
+        <ul class="rules">
+          <li>每日推播優先：保留額度 ＝ 本月剩餘天數 × 1 則 ＋ 安全緩衝。</li>
+          <li>剩餘額度低於保留額度時，暫停異動提醒，並在系統狀態頁顯示原因。</li>
+          <li>查不到 LINE 官方用量時視為額度不足，不假設還有免費額度。</li>
+          <li>不會自動升級方案，也不會加購訊息。</li>
+        </ul>
+      </section>
+
+      <div class="card card--tight" style="flex-direction: row; flex-wrap: wrap; align-items: center; justify-content: space-between">
+        <span class="small soft">上次儲存 <span class="num" id="saved-at">2026/10/12 22:10</span></span>
+        <div class="btn-row">
+          <button type="reset" class="btn">還原變更</button>
+          <button type="submit" class="btn btn--primary">儲存設定</button>
+        </div>
+      </div>
+    </form>
+
+    <div class="col-side">
+
+      <!-- LINE 連線 -->
+      <section class="card card--tight tint tint--green reveal" aria-labelledby="line-h">
+        <div class="card-head" style="align-items: flex-start">
+          <div class="head-stack">
+            <p class="eyebrow">LINE</p>
+            <h2 class="card-title" id="line-h">LINE 連線</h2>
+          </div>
+          <span class="chip chip--ok"><span class="dot"></span>已連線</span>
+        </div>
+        <dl class="kv-list">
+          <dt>Access Token</dt><dd>已設定（只存在伺服器端）</dd>
+          <dt>推播對象</dt><dd>User ID 已設定・末 4 碼 <span class="num">3f2a</span></dd>
+          <dt>最近驗證</dt><dd class="num">2026/10/13 09:00:06</dd>
+        </dl>
+        <div class="divider" style="display: flex; flex-direction: column; gap: 8px">
+          <button type="button" class="btn" id="test-push" style="align-self: flex-start">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 2 11 13"></path><path d="M22 2 15 22l-4-9-9-4 20-7z"></path></svg>
+            發送測試推播
+          </button>
+          <p class="help">會用掉 1 則訊息額度（本月剩餘 177 則）。</p>
+          <p class="small" id="test-result" aria-live="polite">上次測試：<span class="num">10/05 20:14</span> 已送出</p>
+        </div>
+      </section>
+
+      <!-- 每日推播預覽 -->
+      <section class="card card--tight" aria-labelledby="pv-daily-h">
+        <div class="card-head">
+          <h2 class="card-label" id="pv-daily-h">每日推播預覽</h2>
+          <span class="chip chip--mock">模擬資料</span>
+        </div>
+        <div class="msg"><span class="msg__flag">【模擬資料】</span>黃金每日行情
+
+報價：<span class="num">4,051.20</span> USD/金衡盎司
+前一交易日：<span class="num">4,043.95</span>
+漲跌：<span class="num">+7.25</span>
+漲跌幅：<span class="num">+0.18%</span>
+報價時間：<span class="num">2026/10/13 09:00:00</span>
+資料來源：Mock Provider（模擬資料，非真實行情）
+資料狀態：有效（模擬）
+
+參考圖表：
+https://www.truney.com/gold-chart</div>
+        <p class="caption">取自今天 09:00 的每日快照。改用正式行情來源後，訊息不會再出現「模擬資料」。</p>
+      </section>
+
+      <!-- 異動通知預覽 -->
+      <section class="card card--tight" aria-labelledby="pv-alert-h">
+        <div class="card-head">
+          <h2 class="card-label" id="pv-alert-h">異動通知預覽</h2>
+          <span class="chip chip--mock">模擬資料</span>
+        </div>
+        <div class="msg"><span class="msg__flag">【模擬資料】</span>黃金價格異動提醒
+
+目前價格：<span class="num">4,018.60</span> USD/金衡盎司
+參考價格：<span class="num">3,977.25</span>
+價格變化：<span class="num">+1.04%</span>
+觸發條件：上漲 ≥ 1%
+觸發時間：<span class="num">2026/10/09 14:15:00</span>
+資料來源：Mock Provider（模擬資料，非真實行情）
+
+參考圖表：
+https://www.truney.com/gold-chart</div>
+        <p class="caption">取自最近一次已送出的異動事件（10/09）。</p>
+      </section>
+
+    </div>
+  </div>
+</main>
+
+<footer class="site-footer">
+  <div class="site-footer__inner">
+    <div class="site-footer__row">
+      <p class="footer__title">每天 09:00，<br>把金價準時送到 LINE。</p>
+      <nav class="footer__nav" aria-label="頁尾導覽">
+        <a href="index.html">儀表板</a>
+        <a href="history.html">歷史資料</a>
+        <a href="settings.html">推播設定</a>
+        <a href="status.html">系統狀態</a>
+      </nav>
+    </div>
+    <p class="footer__note">所有時間為台北時間（UTC+8），資料庫以 UTC 儲存。提醒門檻是可調整的初始設定，不構成投資建議。行情參考：<a href="https://www.truney.com/gold-chart" target="_blank" rel="noopener">Truney 黃金走勢圖</a></p>
+    <p class="footer__mark" aria-hidden="true">Gold Daily</p>
+  </div>
+</footer>
+
+<script src="assets/app.js"></script>
+</body>
+</html>

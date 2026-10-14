@@ -1,0 +1,141 @@
+<!doctype html>
+<html lang="zh-Hant-TW">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>歷史資料・Gold Daily</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Noto+Sans+TC:wght@400;500;700&family=Noto+Serif+TC:wght@600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/styles.css">
+</head>
+<body data-page="history">
+
+<div class="top top--soft">
+<div class="mock-band">
+  <div class="mock-band__inner">
+    <span class="mock-tag">MOCK</span>
+    <span><b>尚未設定正式行情來源。</b>以下歷史資料由 Mock Provider 產生，只供測試。</span>
+  </div>
+</div>
+
+<header class="site-header">
+  <div class="site-header__inner">
+    <a class="brand" href="index.html">
+      <svg width="28" height="28" viewBox="0 0 28 28" aria-hidden="true"><path class="brand__fill" d="M5 21 L8.5 11 H19.5 L23 21 Z"></path><path class="brand__stroke" d="M8.5 11 L10.5 7 H17.5 L19.5 11"></path></svg>
+      Gold Daily
+    </a>
+    <nav class="nav" aria-label="主要導覽">
+      <a href="index.html">儀表板</a>
+      <a href="history.html" aria-current="page">歷史資料</a>
+      <a href="settings.html">推播設定</a>
+      <a href="status.html">系統狀態</a>
+    </nav>
+    <div class="hchips">
+      <span class="hchip hchip--gold"><span class="dot"></span>行情 Mock・有效</span>
+      <span class="hchip hchip--blue"><span class="dot"></span>LINE 已連線</span>
+    </div>
+  </div>
+</header>
+
+  <div class="page-head">
+    <div class="page-head__text">
+      <p class="eyebrow">History</p>
+      <h1>歷史資料</h1>
+      <p>每日 09:00 快照・價格單位 USD / 金衡盎司・時間為台北時間</p>
+    </div>
+    <span class="chip chip--mock">模擬資料</span>
+  </div>
+</div>
+
+<main class="page" style="gap: 20px">
+
+  <section class="card" style="padding: 20px 24px" aria-label="篩選條件">
+    <div style="display: flex; flex-wrap: wrap; align-items: flex-end; gap: 14px 18px">
+      <div class="field" style="flex: 1 1 170px">
+        <label for="f-from">起始日期</label>
+        <input class="input num" type="date" id="f-from" min="2026-07-15" max="2026-10-13" value="2026-07-15">
+      </div>
+      <div class="field" style="flex: 1 1 170px">
+        <label for="f-to">結束日期</label>
+        <input class="input num" type="date" id="f-to" min="2026-07-15" max="2026-10-13" value="2026-10-13">
+      </div>
+      <div class="field" style="flex: 1 1 190px">
+        <label for="f-status">資料狀態</label>
+        <select class="input" id="f-status">
+          <option value="all">全部</option>
+          <option value="valid">有效</option>
+          <option value="missing">未取得有效報價</option>
+          <option value="noref">無參考價</option>
+        </select>
+      </div>
+      <div class="field" style="flex: 1 1 190px">
+        <label for="f-src">資料來源</label>
+        <select class="input" id="f-src">
+          <option>全部（目前只有 Mock Provider）</option>
+        </select>
+      </div>
+      <button type="button" class="btn" id="h-clear">清除篩選</button>
+    </div>
+  </section>
+
+  <section class="card reveal" style="padding: 24px 28px 14px; gap: 10px" aria-labelledby="tbl-h">
+    <div class="card-head" style="align-items: flex-end">
+      <div class="head-stack">
+        <p class="eyebrow">Daily snapshots</p>
+        <h2 class="card-title" id="tbl-h">每日快照</h2>
+      </div>
+      <p class="small soft">共 <span class="num" id="h-count">—</span> 筆・只列交易日・漲跌以前一個有效交易日為基準</p>
+    </div>
+    <div class="table-wrap">
+      <table class="tbl tbl--history">
+        <thead>
+          <tr>
+            <th>日期</th>
+            <th class="r">黃金價格</th>
+            <th class="r">漲跌金額</th>
+            <th class="r">漲跌幅</th>
+            <th>資料來源</th>
+            <th>報價時間</th>
+            <th>資料狀態</th>
+          </tr>
+        </thead>
+        <tbody id="history-body"></tbody>
+      </table>
+      <div class="empty" id="history-empty" style="margin: 16px 0" hidden>
+        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"></circle><path d="m20 20-3.5-3.5"></path></svg>
+        <span class="empty__title">這個條件下沒有快照</span>
+        <span class="empty__text">調整日期區間或資料狀態再試一次。</span>
+      </div>
+    </div>
+    <nav class="pager" aria-label="分頁">
+      <span class="small soft">第 <span class="num" id="h-page">1</span> / <span class="num" id="h-pages">1</span> 頁・每頁 20 筆</span>
+      <div class="pager__pages">
+        <button type="button" class="btn" id="h-prev">上一頁</button>
+        <span class="pager__pages" id="h-pagebtns"></span>
+        <button type="button" class="btn" id="h-next">下一頁</button>
+      </div>
+    </nav>
+  </section>
+
+</main>
+
+<footer class="site-footer">
+  <div class="site-footer__inner">
+    <div class="site-footer__row">
+      <p class="footer__title">每天 09:00，<br>把金價準時送到 LINE。</p>
+      <nav class="footer__nav" aria-label="頁尾導覽">
+        <a href="index.html">儀表板</a>
+        <a href="history.html">歷史資料</a>
+        <a href="settings.html">推播設定</a>
+        <a href="status.html">系統狀態</a>
+      </nav>
+    </div>
+    <p class="footer__note">所有時間為台北時間（UTC+8），資料庫以 UTC 儲存。提醒門檻是可調整的初始設定，不構成投資建議。行情參考：<a href="https://www.truney.com/gold-chart" target="_blank" rel="noopener">Truney 黃金走勢圖</a></p>
+    <p class="footer__mark" aria-hidden="true">Gold Daily</p>
+  </div>
+</footer>
+
+<script src="assets/app.js"></script>
+</body>
+</html>

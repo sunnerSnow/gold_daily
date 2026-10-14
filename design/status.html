@@ -1,0 +1,264 @@
+<!doctype html>
+<html lang="zh-Hant-TW">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>系統狀態・Gold Daily</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Noto+Sans+TC:wght@400;500;700&family=Noto+Serif+TC:wght@600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/styles.css">
+</head>
+<body data-page="status">
+
+<div class="top top--soft">
+<div class="mock-band">
+  <div class="mock-band__inner">
+    <span class="mock-tag">MOCK</span>
+    <span><b>尚未設定正式行情來源。</b>系統運作正常，但所有報價都來自 Mock Provider。</span>
+    <a href="#provider">查看設定進度 →</a>
+  </div>
+</div>
+
+<header class="site-header">
+  <div class="site-header__inner">
+    <a class="brand" href="index.html">
+      <svg width="28" height="28" viewBox="0 0 28 28" aria-hidden="true"><path class="brand__fill" d="M5 21 L8.5 11 H19.5 L23 21 Z"></path><path class="brand__stroke" d="M8.5 11 L10.5 7 H17.5 L19.5 11"></path></svg>
+      Gold Daily
+    </a>
+    <nav class="nav" aria-label="主要導覽">
+      <a href="index.html">儀表板</a>
+      <a href="history.html">歷史資料</a>
+      <a href="settings.html">推播設定</a>
+      <a href="status.html" aria-current="page">系統狀態</a>
+    </nav>
+    <div class="hchips">
+      <span class="hchip hchip--gold"><span class="dot"></span>行情 Mock・有效</span>
+      <span class="hchip hchip--blue"><span class="dot"></span>LINE 已連線</span>
+    </div>
+  </div>
+</header>
+
+  <div class="page-head">
+    <div class="page-head__text">
+      <p class="eyebrow">System</p>
+      <h1>系統狀態</h1>
+      <p>頁面更新 <span class="num">10:42:18</span>・每分鐘自動重新整理</p>
+    </div>
+  </div>
+</div>
+
+<main class="page">
+
+  <!-- 健康狀態 -->
+  <div class="tiles">
+    <section class="card card--tight tile tint tint--yellow reveal" aria-labelledby="t1">
+      <h2 class="card-label" id="t1">行情來源</h2>
+      <p class="tile__value">Mock Provider</p>
+      <div class="tile__chips"><span class="chip chip--ok"><span class="dot"></span>運作中</span><span class="chip chip--mock">非正式行情</span></div>
+      <p class="small soft">正式來源：尚未設定</p>
+    </section>
+    <section class="card card--tight tile tint tint--cyan reveal" aria-labelledby="t2">
+      <h2 class="card-label" id="t2">最近成功報價</h2>
+      <p class="tile__value num">10:30:04</p>
+      <div class="tile__chips"><span class="chip chip--ok"><span class="dot"></span>有效</span></div>
+      <p class="small soft">12 分鐘前・報價時間 <span class="num">10:30:00</span></p>
+    </section>
+    <section class="card card--tight tile tint tint--green reveal" aria-labelledby="t3">
+      <h2 class="card-label" id="t3">排程</h2>
+      <p class="tile__value">正常</p>
+      <div class="tile__chips"><span class="chip chip--ok"><span class="dot"></span>每日快照</span><span class="chip chip--ok"><span class="dot"></span>盤中檢查</span></div>
+      <p class="small soft">每日：下次 <span class="num">10/14 09:00</span>・盤中：下次 <span class="num">10:45</span></p>
+    </section>
+    <section class="card card--tight tile tint tint--pink reveal" aria-labelledby="t4">
+      <h2 class="card-label" id="t4">LINE 推播</h2>
+      <p class="tile__value">已設定</p>
+      <div class="tile__chips"><span class="chip chip--ok"><span class="dot"></span>推播未暫停</span></div>
+      <p class="small soft">最近推播 <span class="num">09:00:06</span> 已送出</p>
+    </section>
+  </div>
+
+  <!-- 正式行情來源 -->
+  <div class="row" id="provider">
+    <section class="card col-main" aria-labelledby="prov-h">
+      <div class="card-head">
+        <div class="head-stack">
+          <p class="eyebrow">Data source</p>
+          <div class="card-head__title">
+            <h2 class="card-title" id="prov-h">正式行情來源</h2>
+            <span class="chip chip--warn"><span class="dot"></span>尚未設定</span>
+          </div>
+        </div>
+        <a class="lnk" href="https://www.truney.com/gold-chart" target="_blank" rel="noopener">Truney 參考圖表 →</a>
+      </div>
+      <p class="small soft">Truney 的圖表由 TradingView 提供，沒有公開 API。系統不會抓取該頁面，也不會使用 TradingView 的內部請求。正式來源要另外選定有授權的行情服務。</p>
+      <h3 style="font-size: 14.5px; font-weight: 700">待確認事項</h3>
+      <ul class="checklist">
+        <li><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="4" y="4" width="16" height="16" rx="3"></rect></svg><span>Truney 圖表使用的商品代號（現貨或期貨、哪個報價源）</span></li>
+        <li><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="4" y="4" width="16" height="16" rx="3"></rect></svg><span>價格定義：買價、賣價或中價，以及是否延遲報價</span></li>
+        <li><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="4" y="4" width="16" height="16" rx="3"></rect></svg><span>幣別與單位：維持 USD / 金衡盎司，或另外換算成 TWD / 公克（換算需要匯率來源）</span></li>
+        <li><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="4" y="4" width="16" height="16" rx="3"></rect></svg><span>候選服務的授權條款：是否允許個人儲存歷史資料與推播</span></li>
+        <li><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="4" y="4" width="16" height="16" rx="3"></rect></svg><span>更新頻率、呼叫次數上限與費用</span></li>
+      </ul>
+    </section>
+
+    <section class="card col-side" aria-labelledby="steps-h">
+      <div class="head-stack">
+        <p class="eyebrow">Roadmap</p>
+        <h2 class="card-title" id="steps-h">設定進度</h2>
+      </div>
+      <ol class="steps">
+        <li class="is-active"><span class="steps__title">比較候選行情服務</span><span class="chip chip--warn">進行中</span><span class="steps__desc">授權、費用、更新頻率、商品代號</span></li>
+        <li><span class="steps__title">確認授權與使用限制</span><span class="chip chip--muted">未開始</span></li>
+        <li><span class="steps__title">設定 Provider 與 API Key</span><span class="chip chip--muted">未開始</span><span class="steps__desc num">GOLD_PRICE_PROVIDER、GOLD_PRICE_API_KEY</span></li>
+        <li><span class="steps__title">用真實回應驗證串接</span><span class="chip chip--muted">未開始</span><span class="steps__desc">核對商品代號、幣別、單位、時間戳</span></li>
+        <li><span class="steps__title">切換正式來源</span><span class="chip chip--muted">未開始</span><span class="steps__desc">完成後才移除「模擬資料」標示</span></li>
+      </ol>
+    </section>
+  </div>
+
+  <!-- LINE 訊息額度 -->
+  <section class="card" id="quota" aria-labelledby="quota-h">
+    <div class="card-head">
+      <div class="head-stack">
+        <p class="eyebrow">Quota</p>
+        <div class="card-head__title">
+          <h2 class="card-title" id="quota-h">LINE 訊息額度</h2>
+          <span class="chip chip--ok"><span class="dot"></span>推播未暫停</span>
+        </div>
+      </div>
+      <span class="chip chip--muted">不自動升級・不加購</span>
+    </div>
+    <div style="display: flex; flex-direction: column; gap: 8px">
+      <div style="display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline; gap: 8px">
+        <span><span class="num" style="font-size: 30px; font-weight: 600">177</span> <span class="soft">則可用（保守估算）</span></span>
+        <span class="small soft">本月已用 <span class="num">23</span> / <span class="num">200</span> 則</span>
+      </div>
+      <div class="quota-bar" style="height: 14px; border-radius: 7px" role="img" aria-label="已使用 23 則，每日推播保留 23 則，異動提醒可用 154 則，共 200 則">
+        <span class="quota-bar__used" style="width: 11.5%"></span>
+        <span class="quota-bar__reserve" style="width: 11.5%"></span>
+      </div>
+      <div class="legend">
+        <span><i class="sw-used"></i>已使用 23</span>
+        <span><i class="sw-reserve"></i>每日推播保留 23</span>
+        <span><i class="sw-free"></i>異動提醒可用 154</span>
+      </div>
+    </div>
+    <dl class="kv divider">
+      <div><dt>目前方案</dt><dd>輕用量（免費）</dd></div>
+      <div><dt>官方可用免費額度</dt><dd><span class="num">200</span> 則</dd></div>
+      <div><dt>本月已使用（LINE 官方）</dt><dd><span class="num">23</span> 則</dd></div>
+      <div><dt>本月已使用（本地紀錄）</dt><dd><span class="num">21</span> 則<span class="cell-note">差 2 則，可能是同一官方帳號送出的其他訊息</span></dd></div>
+      <div><dt>本地估算剩餘</dt><dd><span class="num">177</span> 則<span class="cell-note">取官方與本地紀錄中較少的剩餘量</span></dd></div>
+      <div><dt>每日推播保留</dt><dd><span class="num">23</span> 則<span class="cell-note">剩餘 18 天 × 1 則 ＋ 緩衝 5 則</span></dd></div>
+      <div><dt>最近同步</dt><dd class="num">2026/10/13 10:30:05</dd></div>
+      <div><dt>額度重置</dt><dd>依 LINE 官方計費週期<span class="cell-note">[待確認：週期起算時間與時區]</span></dd></div>
+    </dl>
+    <p class="caption">官方用量來自 LINE Messaging API（<span class="num">GET /v2/bot/message/quota</span>、<span class="num">/v2/bot/message/quota/consumption</span>）。同步失敗時視為額度不足，先暫停異動提醒。</p>
+  </section>
+
+  <!-- 服務與費用 -->
+  <section class="card" aria-labelledby="cost-h">
+    <div class="head-stack">
+      <p class="eyebrow">Costs</p>
+      <h2 class="card-title" id="cost-h">服務與費用</h2>
+    </div>
+    <div class="table-wrap">
+      <table class="tbl tbl--costs">
+        <thead>
+          <tr><th>服務</th><th>用途</th><th>方案</th><th>費用</th><th>備註</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>LINE 官方帳號</td><td>每日推播、異動提醒</td><td>輕用量（免費）</td><td>免費額度內</td><td class="soft">額度用完就暫停非必要推播，不加購</td></tr>
+          <tr><td>Supabase</td><td>資料庫</td><td class="soft">[待確認]</td><td class="soft">[待確認]</td><td class="soft">免費方案限制見 README</td></tr>
+          <tr><td>Vercel</td><td>網站、每日排程</td><td class="soft">[待確認]</td><td class="soft">[待確認]</td><td class="soft">排程頻率受方案限制</td></tr>
+          <tr><td>外部排程服務</td><td>盤中檢查（每 15 分鐘）</td><td class="soft">[服務名稱・方案]</td><td class="soft">[待確認]</td><td class="soft">部署方案不支援 15 分鐘排程時才需要</td></tr>
+          <tr><td>行情 API</td><td>正式報價</td><td>尚未設定</td><td class="soft">[待確認]</td><td class="soft">選定後補上方案與費用</td></tr>
+          <tr><td>Mock Provider</td><td>開發與測試</td><td>—</td><td>無</td><td class="soft">資料皆為模擬</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- 最近一次錯誤 -->
+  <section class="card" aria-labelledby="err-h">
+    <div class="card-head">
+      <div class="head-stack">
+        <p class="eyebrow">Errors</p>
+        <h2 class="card-title" id="err-h">最近一次錯誤</h2>
+      </div>
+      <span class="chip chip--muted">已恢復</span>
+    </div>
+    <div class="note note--err">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M12 7v6"></path><path d="M12 16.5h.01"></path></svg>
+      <div style="display: flex; flex-direction: column; gap: 4px">
+        <span><span class="num">2026/10/12 21:15:00</span>・盤中檢查 <span class="num">intraday_check</span></span>
+        <span><b>行情來源逾時（10 秒），重試 2 次後放棄。</b>這一輪沒有判斷異動，也沒有發送通知。下一輪 <span class="num">21:30</span> 已恢復正常。</span>
+        <span class="small">錯誤代碼 <span class="num">PROVIDER_TIMEOUT</span>・紀錄 <span class="num">job_runs #1287</span></span>
+      </div>
+    </div>
+    <p class="caption">這裡只顯示錯誤摘要。完整紀錄留在伺服器日誌，日誌不寫入 Token 等敏感資料。</p>
+  </section>
+
+  <!-- 排程執行紀錄 -->
+  <section class="card" id="jobs" aria-labelledby="jobs-h">
+    <div class="card-head">
+      <div class="head-stack">
+        <p class="eyebrow">Job runs</p>
+        <div class="card-head__title">
+          <h2 class="card-title" id="jobs-h">排程執行紀錄</h2>
+          <span class="small soft">顯示 <span class="num" id="jobs-count">13</span> 筆</span>
+        </div>
+      </div>
+      <div class="seg" role="group" aria-label="篩選工作類型">
+        <button type="button" class="seg__btn" data-filter="all" aria-pressed="true">全部</button>
+        <button type="button" class="seg__btn" data-filter="daily" aria-pressed="false">每日快照</button>
+        <button type="button" class="seg__btn" data-filter="intraday" aria-pressed="false">盤中檢查</button>
+        <button type="button" class="seg__btn" data-filter="quota" aria-pressed="false">額度同步</button>
+      </div>
+    </div>
+    <div class="table-wrap">
+      <table class="tbl tbl--jobs">
+        <thead>
+          <tr><th>工作</th><th>開始</th><th>結束</th><th class="r">耗時</th><th>狀態</th><th class="r">處理筆數</th><th>說明</th></tr>
+        </thead>
+        <tbody id="jobs-body">
+          <tr data-job="quota"><td>額度同步 <span class="cell-note num">quota_sync</span></td><td class="num nowrap">10/13 10:30:05</td><td class="num nowrap">10:30:06</td><td class="num r">0.8 秒</td><td><span class="chip chip--ok">成功</span></td><td class="num r">1</td><td>官方用量 23 則</td></tr>
+          <tr data-job="intraday"><td>盤中檢查 <span class="cell-note num">intraday_check</span></td><td class="num nowrap">10/13 10:30:00</td><td class="num nowrap">10:30:04</td><td class="num r">4.2 秒</td><td><span class="chip chip--ok">成功</span></td><td class="num r">1</td><td>寫入 1 筆報價，未觸發提醒</td></tr>
+          <tr data-job="intraday"><td>盤中檢查 <span class="cell-note num">intraday_check</span></td><td class="num nowrap">10/13 10:15:00</td><td class="num nowrap">10:15:03</td><td class="num r">3.6 秒</td><td><span class="chip chip--ok">成功</span></td><td class="num r">1</td><td>寫入 1 筆報價，未觸發提醒</td></tr>
+          <tr data-job="intraday"><td>盤中檢查 <span class="cell-note num">intraday_check</span></td><td class="num nowrap">10/13 10:00:00</td><td class="num nowrap">10:00:04</td><td class="num r">3.9 秒</td><td><span class="chip chip--ok">成功</span></td><td class="num r">1</td><td>寫入 1 筆報價，未觸發提醒</td></tr>
+          <tr data-job="intraday"><td>盤中檢查 <span class="cell-note num">intraday_check</span></td><td class="num nowrap">10/13 09:45:00</td><td class="num nowrap">09:45:03</td><td class="num r">3.4 秒</td><td><span class="chip chip--ok">成功</span></td><td class="num r">1</td><td>寫入 1 筆報價，未觸發提醒</td></tr>
+          <tr data-job="intraday"><td>盤中檢查 <span class="cell-note num">intraday_check</span></td><td class="num nowrap">10/13 09:30:00</td><td class="num nowrap">09:30:03</td><td class="num r">3.5 秒</td><td><span class="chip chip--ok">成功</span></td><td class="num r">1</td><td>寫入 1 筆報價，未觸發提醒</td></tr>
+          <tr data-job="intraday"><td>盤中檢查 <span class="cell-note num">intraday_check</span></td><td class="num nowrap">10/13 09:15:00</td><td class="num nowrap">09:15:04</td><td class="num r">4.0 秒</td><td><span class="chip chip--ok">成功</span></td><td class="num r">1</td><td>寫入 1 筆報價，未觸發提醒</td></tr>
+          <tr data-job="daily"><td>每日快照 <span class="cell-note num">daily_snapshot</span></td><td class="num nowrap">10/13 09:00:41</td><td class="num nowrap">09:00:41</td><td class="num r">0.3 秒</td><td><span class="chip chip--muted">略過</span></td><td class="num r">0</td><td>重複觸發：今日快照與推播已存在，未重複送出</td></tr>
+          <tr data-job="daily"><td>每日快照 <span class="cell-note num">daily_snapshot</span></td><td class="num nowrap">10/13 09:00:02</td><td class="num nowrap">09:00:06</td><td class="num r">4.1 秒</td><td><span class="chip chip--ok">成功</span></td><td class="num r">1</td><td>寫入快照，推播 <span class="num">daily:2026-10-13</span></td></tr>
+          <tr data-job="intraday"><td>盤中檢查 <span class="cell-note num">intraday_check</span></td><td class="num nowrap">10/12 21:30:00</td><td class="num nowrap">21:30:03</td><td class="num r">3.2 秒</td><td><span class="chip chip--ok">成功</span></td><td class="num r">1</td><td>來源恢復，寫入 1 筆報價</td></tr>
+          <tr data-job="intraday"><td>盤中檢查 <span class="cell-note num">intraday_check</span></td><td class="num nowrap">10/12 21:15:00</td><td class="num nowrap">21:15:32</td><td class="num r">32.4 秒</td><td><span class="chip chip--err">失敗</span></td><td class="num r">0</td><td><span class="num">PROVIDER_TIMEOUT</span>，重試 2 次後放棄</td></tr>
+          <tr data-job="quota"><td>額度同步 <span class="cell-note num">quota_sync</span></td><td class="num nowrap">10/12 21:00:05</td><td class="num nowrap">21:00:06</td><td class="num r">0.7 秒</td><td><span class="chip chip--ok">成功</span></td><td class="num r">1</td><td>官方用量 22 則</td></tr>
+          <tr data-job="daily"><td>每日快照 <span class="cell-note num">daily_snapshot</span></td><td class="num nowrap">10/12 09:00:03</td><td class="num nowrap">09:00:07</td><td class="num r">4.4 秒</td><td><span class="chip chip--ok">成功</span></td><td class="num r">1</td><td>寫入快照，推播 <span class="num">daily:2026-10-12</span></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+</main>
+
+<footer class="site-footer">
+  <div class="site-footer__inner">
+    <div class="site-footer__row">
+      <p class="footer__title">每天 09:00，<br>把金價準時送到 LINE。</p>
+      <nav class="footer__nav" aria-label="頁尾導覽">
+        <a href="index.html">儀表板</a>
+        <a href="history.html">歷史資料</a>
+        <a href="settings.html">推播設定</a>
+        <a href="status.html">系統狀態</a>
+      </nav>
+    </div>
+    <p class="footer__note">所有時間為台北時間（UTC+8），資料庫以 UTC 儲存。提醒門檻是可調整的初始設定，不構成投資建議。行情參考：<a href="https://www.truney.com/gold-chart" target="_blank" rel="noopener">Truney 黃金走勢圖</a></p>
+    <p class="footer__mark" aria-hidden="true">Gold Daily</p>
+  </div>
+</footer>
+
+<script src="assets/app.js"></script>
+</body>
+</html>

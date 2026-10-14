@@ -1,0 +1,184 @@
+<!doctype html>
+<html lang="zh-Hant-TW">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>首次啟動・Gold Daily</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Noto+Sans+TC:wght@400;500;700&family=Noto+Serif+TC:wght@600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/styles.css">
+</head>
+<body data-page="first-run">
+
+<div class="top">
+  <div class="mock-band">
+    <div class="mock-band__inner">
+      <span class="mock-tag">MOCK</span>
+      <span><b>尚未設定正式行情來源。</b>可以先用 Mock Provider 測試所有功能，模擬資料一律會標示「模擬資料」。</span>
+    </div>
+  </div>
+
+  <header class="site-header">
+    <div class="site-header__inner">
+      <a class="brand" href="first-run.html">
+        <svg width="30" height="30" viewBox="0 0 28 28" aria-hidden="true"><path class="brand__fill" d="M5 21 L8.5 11 H19.5 L23 21 Z"></path><path class="brand__stroke" d="M8.5 11 L10.5 7 H17.5 L19.5 11"></path></svg>
+        Gold Daily
+      </a>
+      <nav class="nav" aria-label="主要導覽">
+        <a href="first-run.html" aria-current="page">儀表板</a>
+        <a href="history.html">歷史資料</a>
+        <a href="settings.html">推播設定</a>
+        <a href="status.html">系統狀態</a>
+      </nav>
+      <div class="hchips">
+        <span class="hchip hchip--gray"><span class="dot"></span>行情 未設定</span>
+        <span class="hchip hchip--red"><span class="dot"></span>LINE 尚未連線</span>
+      </div>
+    </div>
+  </header>
+
+  <section class="hero" aria-labelledby="welcome-h">
+    <div class="hero__main">
+      <p class="eyebrow">Welcome・首次啟動</p>
+      <h1 class="hero__title" id="welcome-h">歡迎使用 Gold Daily</h1>
+      <p class="hero__lead">完成下面 5 項設定後，系統會每天 09:00 記錄金價、推播到 LINE，並在漲跌達到門檻時提醒你。</p>
+      <div class="progress" role="img" aria-label="設定進度：完成 1 項，共 5 項">
+        <span class="is-on"></span><span></span><span></span><span></span><span></span>
+      </div>
+      <p class="small soft">完成 <span class="num">1</span> / <span class="num">5</span></p>
+    </div>
+
+    <!-- 價格（無資料） -->
+    <aside class="card hero__side" aria-labelledby="price-h">
+      <div class="card-head" style="align-items: flex-start">
+        <div class="head-stack">
+          <p class="eyebrow">Price</p>
+          <h2 class="card-title" id="price-h">黃金價格</h2>
+        </div>
+        <span class="chip chip--muted">無資料</span>
+      </div>
+      <div class="price-line">
+        <span class="price-big is-empty">—</span>
+        <span class="soft">USD / 金衡盎司</span>
+      </div>
+      <p class="small soft">還沒有有效報價。第一次排程執行並通過驗證後才會顯示，不會先放假數字。</p>
+      <dl class="kv-list divider">
+        <dt>報價時間</dt><dd>—</dd>
+        <dt>資料來源</dt><dd>—</dd>
+        <dt>資料狀態</dt><dd>—</dd>
+      </dl>
+    </aside>
+  </section>
+</div>
+
+<main class="page">
+
+  <!-- 設定清單 -->
+  <section class="card reveal" aria-labelledby="setup-h">
+    <div class="card-head" style="align-items: flex-end">
+      <div class="head-stack">
+        <p class="eyebrow">Setup</p>
+        <h2 class="card-title" id="setup-h">開始前的設定</h2>
+      </div>
+      <span class="small soft">完成 <span class="num">1</span> / <span class="num">5</span></span>
+    </div>
+    <ol class="steps">
+      <li class="is-done">
+        <span class="steps__title">資料庫（Supabase）</span>
+        <span class="chip chip--ok"><span class="dot"></span>已連線</span>
+        <span class="steps__desc">4 張資料表已建立：<span class="num">gold_price_snapshots</span>、<span class="num">notification_settings</span>、<span class="num">notification_events</span>、<span class="num">job_runs</span></span>
+      </li>
+      <li class="is-active">
+        <span class="steps__title">行情來源</span>
+        <span class="chip chip--mock">使用 Mock</span>
+        <span class="steps__desc"><span class="num">GOLD_PRICE_PROVIDER=mock</span>。正式來源要先確認授權，進度見<a href="status.html#provider">系統狀態</a>。</span>
+      </li>
+      <li>
+        <span class="steps__title">LINE 推播</span>
+        <span class="chip chip--err"><span class="dot"></span>尚未連線</span>
+        <span class="steps__desc">缺少 <span class="num">LINE_CHANNEL_ACCESS_TOKEN</span>、<span class="num">LINE_USER_ID</span>。設定完成前不會送出任何訊息。建立官方帳號的步驟見 README。</span>
+      </li>
+      <li>
+        <span class="steps__title">排程授權</span>
+        <span class="chip chip--err"><span class="dot"></span>未設定</span>
+        <span class="steps__desc">缺少 <span class="num">CRON_SECRET</span>，排程 API 會拒絕所有請求。</span>
+      </li>
+      <li>
+        <span class="steps__title">第一筆每日快照</span>
+        <span class="chip chip--muted">尚未執行</span>
+        <span class="steps__desc" style="display: flex; flex-direction: column; align-items: flex-start; gap: 8px; margin-top: 4px">
+          <button type="button" class="btn" disabled>用 Mock Provider 執行一次</button>
+          <span>完成「排程授權」後可用。會寫入一筆標示為模擬的快照；LINE 尚未連線，所以不會推播。</span>
+        </span>
+      </li>
+    </ol>
+  </section>
+
+  <!-- 走勢（空狀態） -->
+  <section class="card reveal" style="gap: 18px" aria-labelledby="chart-h">
+    <div class="card-head" style="align-items: flex-end">
+      <div class="head-stack">
+        <p class="eyebrow">Trend</p>
+        <h2 class="card-title" id="chart-h">價格走勢</h2>
+      </div>
+      <div class="seg" role="group" aria-label="走勢區間">
+        <button type="button" class="seg__btn" disabled>7 天</button>
+        <button type="button" class="seg__btn" aria-pressed="true" disabled>30 天</button>
+        <button type="button" class="seg__btn" disabled>90 天</button>
+      </div>
+    </div>
+    <div class="empty" style="padding: 64px 20px">
+      <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 3v18h18"></path><path d="m7 15 4-4 3 3 5-6"></path></svg>
+      <span class="empty__title">尚無歷史資料</span>
+      <span class="empty__text">第一筆每日快照寫入後，這裡會顯示近 7／30／90 天走勢。不會用模擬或推估的數值補圖。</span>
+    </div>
+  </section>
+
+  <div class="row">
+    <section class="card col-main reveal" aria-labelledby="ev-h">
+      <div class="head-stack">
+        <p class="eyebrow">Alerts</p>
+        <h2 class="card-title" id="ev-h">最近價格異動事件</h2>
+      </div>
+      <div class="empty">
+        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"></path><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"></path></svg>
+        <span class="empty__title">尚無異動事件</span>
+        <span class="empty__text">有基準價、而且價格達到門檻時才會產生事件。</span>
+      </div>
+    </section>
+
+    <section class="card col-side tint tint--pink reveal" aria-labelledby="line-h">
+      <div class="card-head" style="align-items: flex-start">
+        <div class="head-stack">
+          <p class="eyebrow">LINE</p>
+          <h2 class="card-title" id="line-h">LINE 推播</h2>
+        </div>
+        <span class="chip chip--err"><span class="dot"></span>尚未連線</span>
+      </div>
+      <p style="font-size: 14px"><b>LINE 尚未連線，不會送出任何訊息。</b>每日推播與異動提醒都會先記錄為「未發送」。</p>
+      <a class="btn" href="settings.html" style="align-self: flex-start; text-decoration: none">前往推播設定 →</a>
+    </section>
+  </div>
+
+</main>
+
+<footer class="site-footer">
+  <div class="site-footer__inner">
+    <div class="site-footer__row">
+      <p class="footer__title">每天 09:00，<br>把金價準時送到 LINE。</p>
+      <nav class="footer__nav" aria-label="頁尾導覽">
+        <a href="first-run.html">儀表板</a>
+        <a href="history.html">歷史資料</a>
+        <a href="settings.html">推播設定</a>
+        <a href="status.html">系統狀態</a>
+      </nav>
+    </div>
+    <p class="footer__note">所有時間為台北時間（UTC+8），資料庫以 UTC 儲存。提醒門檻是可調整的初始設定，不構成投資建議。行情參考：<a href="https://www.truney.com/gold-chart" target="_blank" rel="noopener">Truney 黃金走勢圖</a></p>
+    <p class="footer__mark" aria-hidden="true">Gold Daily</p>
+  </div>
+</footer>
+
+<script src="assets/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,329 @@
+<!doctype html>
+<html lang="zh-Hant-TW">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>儀表板・Gold Daily</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Noto+Sans+TC:wght@400;500;700&family=Noto+Serif+TC:wght@600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/styles.css">
+</head>
+<body data-page="dashboard">
+
+<div class="top">
+  <div class="mock-band">
+    <div class="mock-band__inner">
+      <span class="mock-tag">MOCK</span>
+      <span><b>尚未設定正式行情來源。</b>目前使用 Mock Provider，頁面上所有價格都是模擬資料，不代表真實行情。</span>
+      <a href="status.html#provider">查看來源設定進度 →</a>
+    </div>
+  </div>
+
+  <header class="site-header">
+    <div class="site-header__inner">
+      <a class="brand" href="index.html">
+        <svg width="30" height="30" viewBox="0 0 28 28" aria-hidden="true"><path class="brand__fill" d="M5 21 L8.5 11 H19.5 L23 21 Z"></path><path class="brand__stroke" d="M8.5 11 L10.5 7 H17.5 L19.5 11"></path></svg>
+        Gold Daily
+      </a>
+      <nav class="nav" aria-label="主要導覽">
+        <a href="index.html" aria-current="page">儀表板</a>
+        <a href="history.html">歷史資料</a>
+        <a href="settings.html">推播設定</a>
+        <a href="status.html">系統狀態</a>
+      </nav>
+      <div class="hchips">
+        <span class="hchip hchip--gold"><span class="dot"></span><span>行情 Mock・<span data-h="headerState">有效</span></span></span>
+        <span class="hchip hchip--blue"><span class="dot"></span>LINE 已連線</span>
+      </div>
+    </div>
+  </header>
+
+  <h1 class="visually-hidden">儀表板</h1>
+
+  <!-- Hero：最新價格 -->
+  <section class="hero" aria-labelledby="price-h">
+    <div class="hero__main">
+      <div class="note note--warn" id="stale-alert" role="alert" hidden>
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3 2 21h20L12 3z"></path><path d="M12 10v5"></path><path d="M12 18h.01"></path></svg>
+        <span><b>報價已過期。</b>行情來源自 09:00 後沒有更新，已超過 30 分鐘有效期限。下方不是最新價格，盤中異動判斷已暫停。</span>
+      </div>
+      <p class="eyebrow">Today・10/13（二）・頁面更新 <span data-h="now">10:42:18</span></p>
+      <div class="hero__label">
+        <h2 id="price-h">黃金價格</h2>
+        <span class="num small soft">MOCK:XAUUSD</span>
+        <span class="chip chip--ok" id="price-status"><span class="dot"></span><span data-h="statusLabel">有效</span></span>
+        <span class="chip chip--mock">模擬資料</span>
+      </div>
+      <div class="price-line">
+        <span class="price-hero" id="price-big" data-h="price">4,072.35</span>
+        <span class="soft">USD / 金衡盎司</span>
+      </div>
+      <div class="hero__change">
+        <span class="change-pill">
+          <span class="num up">▲ <span data-h="chg">+28.40</span></span>
+          <span class="num up" data-h="pct">+0.70%</span>
+        </span>
+        <span class="small soft">較前一交易日（10/12）參考價 <span class="num">4,043.95</span></span>
+      </div>
+      <ul class="meta-pills" aria-label="報價資訊">
+        <li class="meta-pill"><b>報價時間</b><span class="num" data-h="quote">2026/10/13 10:30:00</span></li>
+        <li class="meta-pill"><b>系統取得</b><span class="num" data-h="fetched">2026/10/13 10:30:04</span></li>
+        <li class="meta-pill"><b>新鮮度</b><span><span data-h="age">12 分鐘前</span>（30 分鐘內有效）</span></li>
+        <li class="meta-pill"><b>延遲報價</b><span>供應商未提供</span></li>
+        <li class="meta-pill"><b>來源</b><span>Mock Provider（測試用）</span></li>
+        <li class="meta-pill"><a href="https://www.truney.com/gold-chart" target="_blank" rel="noopener">Truney 參考圖表 ↗</a></li>
+      </ul>
+    </div>
+
+    <!-- 異動提醒基準 -->
+    <aside class="card hero__side" style="gap: 16px" aria-labelledby="base-h">
+      <div class="card-head">
+        <div class="head-stack">
+          <p class="eyebrow">Alert baseline</p>
+          <h2 class="card-title" id="base-h">異動提醒基準</h2>
+        </div>
+        <span class="chip chip--ok">提醒啟用</span>
+      </div>
+      <div>
+        <div class="num" style="font-size: 30px; font-weight: 600; line-height: 1.2">4,051.20</div>
+        <div class="small soft">當日首筆有效報價・<span class="num">10/13 09:00:00</span></div>
+      </div>
+      <div class="gauge" id="gauge">
+        <div class="gauge__track">
+          <span class="gauge__end gauge__end--down"></span>
+          <span class="gauge__end gauge__end--up"></span>
+          <span class="gauge__mid"></span>
+          <span class="gauge__bubble num" style="left: 76%" data-h="vsBase">+0.52%</span>
+          <span class="gauge__marker" style="left: 76%"></span>
+        </div>
+        <div class="gauge__labels">
+          <div><b class="down">▼ 下跌 1%</b><span class="num">4,010.69</span></div>
+          <div style="text-align: center"><b>基準</b><span class="num">4,051.20</span></div>
+          <div style="text-align: right"><b class="up">▲ 上漲 1%</b><span class="num">4,091.71</span></div>
+        </div>
+      </div>
+      <p style="font-size: 14px" data-h="gaugeText">目前價格相對基準 +0.52%，未達 ±1% 門檻。</p>
+      <dl class="kv-list divider">
+        <dt>檢查頻率</dt><dd>每 15 分鐘・下次 <span class="num" data-h="next">10:45</span></dd>
+        <dt>冷卻中</dt><dd>無（同方向冷卻 4 小時）</dd>
+        <dt>基準重設</dt><dd>下一交易日首筆有效報價</dd>
+      </dl>
+    </aside>
+  </section>
+</div>
+
+<main class="page">
+
+  <!-- 行情跑馬燈 -->
+  <div class="ticker reveal" role="region" aria-label="重點數據（模擬資料）">
+    <div class="ticker__viewport">
+      <div class="ticker__track">
+        <div class="ticker__group">
+          <span class="ticker__item"><b>金價（模擬）</b><span class="num" data-h="price">4,072.35</span> <span class="num up">▲ <span data-h="pct">+0.70%</span></span></span>
+          <span class="ticker__sep" aria-hidden="true">◆</span>
+          <span class="ticker__item"><b>前一交易日</b><span class="num">4,043.95</span></span>
+          <span class="ticker__sep" aria-hidden="true">◆</span>
+          <span class="ticker__item"><b>今日基準</b><span class="num">4,051.20</span></span>
+          <span class="ticker__sep" aria-hidden="true">◆</span>
+          <span class="ticker__item"><b>上漲提醒</b><span class="num">≥ 4,091.71</span></span>
+          <span class="ticker__sep" aria-hidden="true">◆</span>
+          <span class="ticker__item"><b>下跌提醒</b><span class="num">≤ 4,010.69</span></span>
+          <span class="ticker__sep" aria-hidden="true">◆</span>
+          <span class="ticker__item"><b>下次檢查</b><span class="num" data-h="next">10:45</span></span>
+          <span class="ticker__sep" aria-hidden="true">◆</span>
+          <span class="ticker__item"><b>每日推播</b><span class="num">09:00</span></span>
+          <span class="ticker__sep" aria-hidden="true">◆</span>
+          <span class="ticker__item"><b>LINE 本月</b><span class="num">23 / 200</span> 則</span>
+          <span class="ticker__sep" aria-hidden="true">◆</span>
+        </div>
+        <div class="ticker__group" aria-hidden="true">
+          <span class="ticker__item"><b>金價（模擬）</b><span class="num" data-h="price">4,072.35</span> <span class="num up">▲ <span data-h="pct">+0.70%</span></span></span>
+          <span class="ticker__sep">◆</span>
+          <span class="ticker__item"><b>前一交易日</b><span class="num">4,043.95</span></span>
+          <span class="ticker__sep">◆</span>
+          <span class="ticker__item"><b>今日基準</b><span class="num">4,051.20</span></span>
+          <span class="ticker__sep">◆</span>
+          <span class="ticker__item"><b>上漲提醒</b><span class="num">≥ 4,091.71</span></span>
+          <span class="ticker__sep">◆</span>
+          <span class="ticker__item"><b>下跌提醒</b><span class="num">≤ 4,010.69</span></span>
+          <span class="ticker__sep">◆</span>
+          <span class="ticker__item"><b>下次檢查</b><span class="num" data-h="next">10:45</span></span>
+          <span class="ticker__sep">◆</span>
+          <span class="ticker__item"><b>每日推播</b><span class="num">09:00</span></span>
+          <span class="ticker__sep">◆</span>
+          <span class="ticker__item"><b>LINE 本月</b><span class="num">23 / 200</span> 則</span>
+          <span class="ticker__sep">◆</span>
+        </div>
+      </div>
+    </div>
+    <button type="button" class="ticker__toggle" aria-pressed="false" aria-label="暫停跑馬燈">
+      <svg class="i-pause" width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x="6" y="5" width="4" height="14" rx="1"></rect><rect x="14" y="5" width="4" height="14" rx="1"></rect></svg>
+      <svg class="i-play" width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8 5v14l11-7z"></path></svg>
+    </button>
+  </div>
+
+  <!-- 價格走勢 -->
+  <section class="card reveal" style="gap: 20px" aria-labelledby="chart-h">
+    <div class="card-head" style="align-items: flex-end">
+      <div class="head-stack">
+        <p class="eyebrow">Trend</p>
+        <div class="card-head__title">
+          <h2 class="card-title" id="chart-h">價格走勢</h2>
+          <span class="chip chip--mock">模擬資料</span>
+        </div>
+      </div>
+      <div class="seg" role="group" aria-label="走勢區間">
+        <button type="button" class="seg__btn" data-range="7" aria-pressed="false">7 天</button>
+        <button type="button" class="seg__btn" data-range="30" aria-pressed="true">30 天</button>
+        <button type="button" class="seg__btn" data-range="90" aria-pressed="false">90 天</button>
+      </div>
+    </div>
+    <dl class="stats">
+      <div><dt>區間最高</dt><dd class="num" id="st-hi">—</dd></div>
+      <div><dt>區間最低</dt><dd class="num" id="st-lo">—</dd></div>
+      <div><dt>區間漲跌</dt><dd class="num" id="st-delta">—</dd></div>
+      <div><dt>資料點</dt><dd><span class="num" id="st-count">—</span> 筆每日快照</dd></div>
+    </dl>
+    <figure class="chart" id="chart">
+      <svg id="chart-svg" role="img" tabindex="0" aria-label="價格走勢"></svg>
+      <div class="chart__tip" hidden></div>
+    </figure>
+    <p class="visually-hidden" id="chart-live" aria-live="polite"></p>
+    <p class="caption">資料取自 gold_price_snapshots 的每日 09:00 快照（Mock Provider）。只畫已寫入的有效快照，缺漏日不補值。逐筆數字見<a href="history.html">歷史資料</a>。</p>
+  </section>
+
+  <div class="row">
+
+    <!-- 最近價格異動事件 -->
+    <section class="card col-main reveal" style="gap: 14px" aria-labelledby="ev-h">
+      <div class="card-head" style="align-items: flex-end">
+        <div class="head-stack">
+          <p class="eyebrow">Alerts</p>
+          <h2 class="card-title" id="ev-h">最近價格異動事件</h2>
+        </div>
+        <a class="lnk" href="status.html#jobs">全部紀錄 →</a>
+      </div>
+      <div class="table-wrap">
+        <table class="tbl tbl--events">
+          <thead>
+            <tr><th>觸發時間</th><th>方向</th><th class="r">價格</th><th class="r">相對基準</th><th>門檻</th><th>發送狀態</th></tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td class="num nowrap">10/09 15:30</td>
+              <td class="up nowrap">▲ 上漲</td>
+              <td class="num r">4,026.10</td>
+              <td class="num r up">+1.23%</td>
+              <td class="nowrap">上漲 ≥ 1%</td>
+              <td><span class="chip chip--muted">冷卻中・未發送</span><span class="cell-note">距上次同方向提醒 75 分鐘</span></td>
+            </tr>
+            <tr>
+              <td class="num nowrap">10/09 14:15</td>
+              <td class="up nowrap">▲ 上漲</td>
+              <td class="num r">4,018.60</td>
+              <td class="num r up">+1.04%</td>
+              <td class="nowrap">上漲 ≥ 1%</td>
+              <td><span class="chip chip--ok">已送出</span><span class="cell-note">第 1 次嘗試</span></td>
+            </tr>
+            <tr>
+              <td class="num nowrap">10/07 11:00</td>
+              <td class="down nowrap">▼ 下跌</td>
+              <td class="num r">3,951.40</td>
+              <td class="num r down">−1.12%</td>
+              <td class="nowrap">下跌 ≥ 1%</td>
+              <td><span class="chip chip--warn">重試後送出</span><span class="cell-note">第 1 次 LINE 回應逾時，第 2 次成功</span></td>
+            </tr>
+            <tr>
+              <td class="num nowrap">10/02 13:45</td>
+              <td class="down nowrap">▼ 下跌</td>
+              <td class="num r">3,968.25</td>
+              <td class="num r down">−1.03%</td>
+              <td class="nowrap">下跌 ≥ 1%</td>
+              <td><span class="chip chip--ok">已送出</span><span class="cell-note">第 1 次嘗試</span></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="caption">每個事件用 idempotency key 去重（例：<span class="num">alert:up:2026-10-09:b0900</span>），排程重試或系統重啟都不會重複推播。</p>
+    </section>
+
+    <div class="col-side">
+
+      <!-- 最近一次排程 -->
+      <section class="card card--tight tint tint--cyan reveal" aria-labelledby="job-h">
+        <div class="card-head" style="align-items: flex-start">
+          <div class="head-stack">
+            <p class="eyebrow">Jobs</p>
+            <h2 class="card-title" id="job-h">最近一次排程</h2>
+          </div>
+          <span class="chip chip--ok" id="job-status"><span class="dot"></span><span data-h="jobStatus">成功</span></span>
+        </div>
+        <div>
+          <div style="font-weight: 700">盤中檢查 <span class="num small soft" style="font-weight: 400">intraday_check</span></div>
+          <div class="num small soft" data-h="jobTime">10:30:00 → 10:30:04（4.2 秒）</div>
+          <div class="small" data-h="jobNote">寫入 1 筆報價，未觸發提醒。</div>
+        </div>
+        <div class="divider small" style="display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px; align-items: center">
+          <span>每日快照 <span class="num soft">09:00:02</span></span>
+          <span class="chip chip--ok">成功・寫入 1 筆</span>
+        </div>
+        <a class="lnk" href="status.html#jobs">排程執行紀錄 →</a>
+      </section>
+
+      <!-- 最近一次 LINE 推播 -->
+      <section class="card card--tight tint tint--green reveal" aria-labelledby="line-h">
+        <div class="card-head" style="align-items: flex-start">
+          <div class="head-stack">
+            <p class="eyebrow">LINE</p>
+            <h2 class="card-title" id="line-h">最近一次推播</h2>
+          </div>
+          <span class="chip chip--ok"><span class="dot"></span>已送出</span>
+        </div>
+        <div>
+          <div style="font-weight: 700">每日行情</div>
+          <div class="num small soft">2026/10/13 09:00:06・第 1 次嘗試</div>
+          <div class="small">事件鍵 <span class="num">daily:2026-10-13</span></div>
+        </div>
+        <div class="divider" style="display: flex; flex-direction: column; gap: 8px">
+          <div style="display: flex; justify-content: space-between; align-items: baseline; gap: 8px">
+            <span class="small soft">本月訊息額度</span>
+            <span><span class="num" style="font-size: 18px; font-weight: 600">23</span><span class="num soft"> / 200 則</span></span>
+          </div>
+          <div class="quota-bar" style="background: var(--surface)" role="img" aria-label="已使用 23 則，每日推播保留 23 則，異動提醒可用 154 則，共 200 則">
+            <span class="quota-bar__used" style="width: 11.5%"></span>
+            <span class="quota-bar__reserve" style="width: 11.5%"></span>
+          </div>
+          <div class="legend">
+            <span><i class="sw-used"></i>已使用 23</span>
+            <span><i class="sw-reserve"></i>每日推播保留 23</span>
+            <span><i class="sw-free" style="background: var(--surface)"></i>異動提醒可用 154</span>
+          </div>
+          <div class="caption">LINE 官方用量同步 <span class="num">10:30:05</span>・推播未暫停</div>
+        </div>
+        <a class="lnk" href="settings.html">推播設定 →</a>
+      </section>
+
+    </div>
+  </div>
+</main>
+
+<footer class="site-footer">
+  <div class="site-footer__inner">
+    <div class="site-footer__row">
+      <p class="footer__title">每天 09:00，<br>把金價準時送到 LINE。</p>
+      <nav class="footer__nav" aria-label="頁尾導覽">
+        <a href="index.html">儀表板</a>
+        <a href="history.html">歷史資料</a>
+        <a href="settings.html">推播設定</a>
+        <a href="status.html">系統狀態</a>
+      </nav>
+    </div>
+    <p class="footer__note">所有時間為台北時間（UTC+8），資料庫以 UTC 儲存。提醒門檻是可調整的初始設定，不構成投資建議。行情參考：<a href="https://www.truney.com/gold-chart" target="_blank" rel="noopener">Truney 黃金走勢圖</a></p>
+    <p class="footer__mark" aria-hidden="true">Gold Daily</p>
+  </div>
+</footer>
+
+<script src="assets/app.js"></script>
+</body>
+</html>

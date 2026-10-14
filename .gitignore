@@ -1,0 +1,7 @@
+# 真實的環境變數檔絕不進版控（web/.gitignore 也有同樣規則）
+.env*
+!.env.example
+
+node_modules/
+.DS_Store
+Thumbs.db
