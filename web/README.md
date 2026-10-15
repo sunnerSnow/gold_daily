@@ -2,13 +2,13 @@
 
 個人使用的金價追蹤工具：每天定時取得金價、存歷史快照、推播 LINE 每日行情，漲跌達門檻時另外提醒。
 
-> **目前狀態（2026-10-14）**
-> - 正式行情來源採用 **GoldAPI.io 免費方案**（每月 100 次），已實作並以假回應測試；填入 `GOLD_PRICE_API_KEY` 後才會實際呼叫。沒有金鑰時可用 Mock Provider（畫面與推播都會標示「模擬資料」）。
-> - 預設查價：交易日 09:00（每日推播）＋ 21:30（盤中檢查），週末不推播不查價，每月約 44 次。
-> - 功能：每日推播、百分比異動提醒、到價提醒（觸發一次就自動關閉）、LINE 與行情 API 的額度保護。
-> - LINE、Supabase、排程都已實作，但要你提供帳號與金鑰後才會實際運作（見〈需要你提供的資料〉）。
+> **目前狀態（2026-10-15）**：已上線（Vercel 東京 `hnd1`＋Supabase 東京），由 Supabase pg_cron 每 15 分鐘觸發排程。
+> - 行情來源：**GoldAPI.io 免費方案**（每月 100 次），交易日 09:00（每日推播）＋ 21:30（盤中檢查）查價，週末不查價，每月約 44 次。
+> - 推播：每日行情是 LINE 卡片（漲紅跌綠＋近 30 個交易日走勢圖），預設群發給官方帳號所有好友；另有百分比異動提醒與到價提醒（觸發一次就自動關閉）。
+> - LINE 訊息與行情 API 都有額度保護，不會自動升級或加購。
+> - 沒有金鑰時可用 Mock Provider 在本機開發（畫面與推播都會標示「模擬資料」）。
 
-視覺設計稿在 `../design/`（純 HTML），本專案的樣式由 `design/assets/styles.css` 複製到 `src/app/design.css`。
+畫面截圖與功能介紹見[專案首頁的 README](../README.md)。視覺設計稿在 `../design/`（純 HTML），本專案的樣式由 `design/assets/styles.css` 複製到 `src/app/design.css`。
 
 ---
 
@@ -165,6 +165,8 @@ Token 只放在伺服器端環境變數，不會出現在原始碼、前端或 A
 
 提醒只在查價的時間點判斷：價格在兩次查價之間碰到門檻又回去，會漏掉。這是免費方案（每月 100 次）的取捨。
 
+畫面上的報價狀態依查價時間表判斷（`src/lib/freshness.ts`）：兩次查價之間沿用上一次的報價是正常的，顯示「有效」與「下次查價」時間；週末沿用週五最後一次報價也算正常。只有「查價當下行情來源就沒更新」或「排程沒在預定時間查價」（過了 20 分鐘寬限）才標示過期。每次排程呼叫（包含還沒到時間而略過的）都會記錄時間，系統狀態頁用它判斷排程是否正常。
+
 ### Vercel Cron 的限制
 
 Vercel Hobby（免費）方案的 Cron 每天最多一次，而且只精確到小時（`0 1 * * *` 可能在 01:00–01:59 UTC 之間觸發），失敗不會重試（[文件](https://vercel.com/docs/cron-jobs/usage-and-pricing)）。所以：
@@ -244,15 +246,16 @@ Truney 的金價圖（https://www.truney.com/gold-chart ）由 TradingView 提�
 
 ---
 
-## 需要你提供的資料
+## 需要的帳號與設定
 
-| 項目 | 用途 | 狀態 |
+| 項目 | 用途 | 狀態（2026-10-15） |
 |---|---|---|
-| GoldAPI.io 的 API key | 正式行情來源（已決定採用免費方案） | 待註冊 |
-| Supabase 專案 URL 與 service role key | 保存資料、pg_cron 排程 | 待提供 |
-| LINE Channel Access Token 與 User ID | 推播 | 待提供 |
-| Vercel 專案（或其他部署平台） | 上線 | 待提供 |
-| `CRON_SECRET`、`ADMIN_PASSWORD`、`SESSION_SECRET` | 排程授權與管理介面登入 | 部署時自行產生 |
+| GoldAPI.io 的 API key | 正式行情來源（免費方案） | 已設定 |
+| Supabase 專案 URL 與 service role key | 保存資料、pg_cron 排程 | 已設定（東京，兩份 migration 已執行，pg_cron 運作中） |
+| LINE Channel Access Token | 推播（預設群發給所有好友） | 已設定（輕用量，每月 200 則） |
+| Vercel 專案 | 上線 | 已部署（Root Directory `web`，函式在東京 `hnd1`） |
+| `CRON_SECRET`、`ADMIN_PASSWORD`、`SESSION_SECRET` | 排程授權與管理介面登入 | 已設定（CRON_SECRET 同時存在 Supabase Vault） |
+| `LINE_CHANNEL_SECRET` | 只有「只送指定的人」模式需要（webhook 取得 User ID） | 未使用 |
 
 ## 已知限制
 
