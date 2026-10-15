@@ -1,4 +1,4 @@
-import { formatPercent, formatPrice, formatSigned } from '../gold/math';
+import { computeChange, formatPercent, formatPrice, formatSigned } from '../gold/math';
 import { UNIT_LABEL, type PriceUnit, type QuoteStatus } from '../gold/types';
 import { changeDirection, describeSource, DIRECTION_MARK, instrumentName, type Direction } from '../line/messages';
 import { formatDateLabel } from '../time';
@@ -142,8 +142,8 @@ export interface ChartLabels {
 /** 圖上所有文字。字型只收錄 CHART_GLYPHS，這裡用到的字都要在裡面（有測試檢查） */
 export function buildChartLabels(model: ChartModel, info: ChartInfo): ChartLabels {
   const prev = model.points[model.points.length - 2];
-  const amount = model.last.price - prev.price;
-  const percent = (amount / prev.price) * 100;
+  // 跟每日訊息用同一個 computeChange（先四捨五入到 4 位），圖上的漲跌才不會跟文字差 0.01
+  const { amount, percent } = computeChange(model.last.price, prev.price)!;
   const tone = changeDirection(amount);
   return {
     title: `${instrumentName(info)}・近 ${model.points.length} 個交易日`,

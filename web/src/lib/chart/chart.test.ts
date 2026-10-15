@@ -1,4 +1,6 @@
 import { describe, expect, it } from 'vitest';
+import { computeChange } from '../gold/math';
+import { formatChangeLine } from '../line/messages';
 import {
   buildChartLabels,
   buildChartModel,
@@ -74,6 +76,14 @@ describe('走勢圖文字', () => {
     expect(l.tone).toBe('down');
     expect(l.date).toBe('2026/10/14（三）');
     expect(l.source).toBe('資料來源：GoldAPI.io・每日快照・台灣時間');
+  });
+
+  it('漲跌金額跟每日訊息一致（2026-10-14 真實數字：4161.505 對 4182.45）', () => {
+    // 直接相減是 −20.94499…，會顯示成 −20.94；訊息用 computeChange 是 −20.95，兩邊要一樣
+    const real = buildChartModel(series([4182.45, 4161.505]), 800, 300)!;
+    const change = computeChange(4161.505, 4182.45)!;
+    expect(buildChartLabels(real, info).change).toBe('▼ −20.95（−0.50%）');
+    expect(formatChangeLine(change.amount, change.percent, 'USD')).toBe('▼ −20.95 USD（−0.50%）');
   });
 
   it('模擬資料在圖上也會標示', () => {
