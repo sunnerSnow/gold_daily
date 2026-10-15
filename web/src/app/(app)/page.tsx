@@ -10,7 +10,7 @@ import { formatPercent, formatPrice, formatSigned } from '@/lib/gold/math';
 import { UNIT_LABEL } from '@/lib/gold/types';
 import { REFERENCE_CHART_URL } from '@/lib/line/messages';
 import { getPageDeps } from '@/lib/server';
-import { formatAge, formatTaipei, formatTaipeiTime, taipeiDate } from '@/lib/time';
+import { formatTaipei, formatTaipeiTime, taipeiDate } from '@/lib/time';
 import { loadDashboard, type DashboardData } from '@/lib/view/dashboard';
 
 export const metadata: Metadata = { title: '儀表板' };
@@ -53,11 +53,18 @@ function Dashboard({ data }: { data: DashboardData }) {
       <h1 className="visually-hidden">儀表板</h1>
       <section className="hero on-gold" aria-labelledby="price-h">
         <div className="hero__main">
-          {data.stale ? (
+          {data.freshness?.state === 'source_stale' ? (
             <div className="note note--warn" role="alert">
               <WarnIcon />
               <span>
-                <b>報價已過期。</b>最後有效報價是 {formatAge(latest.quoteTimestamp, data.now)}（超過 {provider.staleAfterMinutes} 分鐘），行情來源沒有更新。下方不是最新價格，盤中異動判斷已暫停。
+                <b>行情來源沒有更新。</b>最近一次查價（{formatTaipei(latest.fetchedAt, false).slice(5)}）拿到的報價時間是 {formatTaipei(latest.quoteTimestamp, false).slice(5)}，超過 {provider.staleAfterMinutes} 分鐘。下方不是最新價格，異動判斷已暫停。
+              </span>
+            </div>
+          ) : data.freshness?.state === 'missed' ? (
+            <div className="note note--warn" role="alert">
+              <WarnIcon />
+              <span>
+                <b>排程沒有在預定時間查價。</b>預定 {formatTaipei(data.freshness.expectedAt, false).slice(5)} 查價，但最新報價停在 {formatTaipei(latest.fetchedAt, false).slice(5)}。請到<Link href="/status">系統狀態</Link>確認排程；異動判斷已暫停。
               </span>
             </div>
           ) : null}
@@ -66,7 +73,7 @@ function Dashboard({ data }: { data: DashboardData }) {
             <h2 id="price-h">黃金價格</h2>
             <span className="num small soft">{latest.symbol}</span>
             {data.stale ? (
-              <span className="chip chip--warn"><span className="dot" />過期</span>
+              <span className="chip chip--warn"><span className="dot" />{data.freshness?.state === 'missed' ? '漏查' : '過期'}</span>
             ) : (
               <span className="chip chip--ok"><span className="dot" />{latest.status === 'delayed' ? '有效・延遲' : '有效'}</span>
             )}
@@ -94,7 +101,7 @@ function Dashboard({ data }: { data: DashboardData }) {
           <ul className="meta-pills" aria-label="報價資訊">
             <li className="meta-pill"><b>報價時間</b><span className="num">{formatTaipei(latest.quoteTimestamp)}</span></li>
             <li className="meta-pill"><b>系統取得</b><span className="num">{formatTaipei(latest.fetchedAt)}</span></li>
-            <li className="meta-pill"><b>新鮮度</b><span>{formatAge(latest.quoteTimestamp, data.now)}（{provider.staleAfterMinutes} 分鐘內有效）</span></li>
+            <li className="meta-pill"><b>下次查價</b><span className="num">{data.nextCheckAt ? formatTaipei(data.nextCheckAt, false).slice(5) : '未排程'}</span></li>
             <li className="meta-pill"><b>延遲報價</b><span>{latest.isDelayed === null ? '供應商未提供' : latest.isDelayed ? '是' : '否'}</span></li>
             <li className="meta-pill"><b>來源</b><span>{provider.isMock ? 'Mock Provider（測試用）' : provider.name}</span></li>
             <li className="meta-pill"><a href={REFERENCE_CHART_URL} target="_blank" rel="noopener noreferrer">Truney 參考圖表 ↗</a></li>

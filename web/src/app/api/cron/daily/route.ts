@@ -5,6 +5,6 @@ import { cronHandler } from '@/lib/jobs/cron-route';
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
 
-const handler = cronHandler((deps) => runDailyJob(deps, { trigger: 'cron' }));
+const handler = cronHandler('daily', (deps) => runDailyJob(deps, { trigger: 'cron' }));
 export const GET = handler;
 export const POST = handler;

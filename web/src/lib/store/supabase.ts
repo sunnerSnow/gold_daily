@@ -438,6 +438,19 @@ export class SupabaseStore implements Store {
     if (r.error) throw new StoreError('釋放排程鎖', r.error);
   }
 
+  async recordCronCall(jobType: string, at: Date) {
+    // 只更新呼叫時間，不碰鎖；還沒有這一列時新增一列「沒有上鎖」的（locked_until 設在過去）
+    const iso = at.toISOString();
+    const r = await this.db.from('job_locks').update({ last_called_at: iso }).eq('job_type', jobType).select('job_type');
+    if (r.error) throw new StoreError('記錄排程呼叫', r.error);
+    if ((r.data ?? []).length > 0) return;
+    const ins = await this.db
+      .from('job_locks')
+      .insert({ job_type: jobType, locked_until: new Date(0).toISOString(), owner: '00000000-0000-0000-0000-000000000000', last_called_at: iso });
+    // 23505：同時有另一個請求先新增了，等於已經記錄
+    if (ins.error && ins.error.code !== '23505') throw new StoreError('記錄排程呼叫', ins.error);
+  }
+
   async getLocks(): Promise<JobLockRow[]> {
     const r = await this.db.from('job_locks').select('*');
     if (r.error) throw new StoreError('讀取排程鎖', r.error);

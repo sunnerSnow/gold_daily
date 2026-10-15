@@ -1,7 +1,7 @@
 import 'server-only';
 import { authMode, type AuthMode } from '../auth/session';
 import { checkEnv, getEnv } from '../env';
-import { isStale } from '../gold/validate';
+import { assessQuote } from '../freshness';
 import type { ProviderStatus } from '../gold/types';
 import type { JobDeps } from '../jobs/deps';
 
@@ -23,8 +23,12 @@ export async function loadChrome(deps: JobDeps): Promise<Chrome> {
   const provider = deps.provider.getProviderStatus();
   let feed: FeedState = 'unconfigured';
   if (provider.configured && provider.instrument) {
-    const latest = await deps.store.getLatestSnapshot({ source: deps.provider.id, symbol: provider.instrument.symbol });
-    feed = !latest ? 'empty' : isStale(latest.quoteTimestamp, deps.now(), provider.staleAfterMinutes) ? 'stale' : 'fresh';
+    const [latest, settings] = await Promise.all([
+      deps.store.getLatestSnapshot({ source: deps.provider.id, symbol: provider.instrument.symbol }),
+      deps.store.getSettings(),
+    ]);
+    // 依查價時間表判斷，兩次查價之間不算過期（見 lib/freshness.ts）
+    feed = !latest ? 'empty' : assessQuote(latest, settings, deps.now(), provider.staleAfterMinutes).state === 'current' ? 'fresh' : 'stale';
   }
   return {
     provider,

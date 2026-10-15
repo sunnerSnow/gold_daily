@@ -250,6 +250,12 @@ export class MemoryStore implements Store {
     if (current && current.owner === owner) current.lockedUntil = this.now();
   }
 
+  async recordCronCall(jobType: string, at: Date) {
+    const current = this.locks.get(jobType);
+    if (current) current.lastCalledAt = at;
+    else this.locks.set(jobType, { jobType, owner: '', lockedUntil: new Date(0), lastCalledAt: at });
+  }
+
   async getLocks() {
     return [...this.locks.values()].map((l) => ({ ...l }));
   }

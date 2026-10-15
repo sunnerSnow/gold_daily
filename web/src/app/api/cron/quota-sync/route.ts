@@ -5,6 +5,6 @@ import { cronHandler } from '@/lib/jobs/cron-route';
 export const dynamic = 'force-dynamic';
 export const maxDuration = 30;
 
-const handler = cronHandler((deps) => runQuotaSyncJob(deps, { trigger: 'cron' }));
+const handler = cronHandler('quota_sync', (deps) => runQuotaSyncJob(deps, { trigger: 'cron' }));
 export const GET = handler;
 export const POST = handler;

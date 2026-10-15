@@ -208,6 +208,8 @@ export interface Store {
 
   tryAcquireLock(jobType: string, owner: string, ttlSeconds: number): Promise<boolean>;
   releaseLock(jobType: string, owner: string): Promise<void>;
+  /** 記錄排程被呼叫的時間（不論這次有沒有真的執行），系統狀態頁用來判斷排程是否正常 */
+  recordCronCall(jobType: string, at: Date): Promise<void>;
   getLocks(): Promise<JobLockRow[]>;
 
   insertQuotaSync(input: NewQuotaSync): Promise<QuotaSyncRow>;

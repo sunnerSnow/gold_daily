@@ -7,7 +7,7 @@ import { z } from 'zod';
 import { authMode, checkPassword, createSessionToken, SESSION_COOKIE, SESSION_TTL_SECONDS } from '@/lib/auth/session';
 import { getEnv } from '@/lib/env';
 import { MOCK_SCENARIOS } from '@/lib/gold/mock-provider';
-import { isStale } from '@/lib/gold/validate';
+import { assessQuote } from '@/lib/freshness';
 import { runDailyJob } from '@/lib/jobs/daily';
 import { describeEvent } from '@/lib/jobs/daily';
 import { safeErrorMessage } from '@/lib/jobs/deps';
@@ -181,7 +181,8 @@ export async function resetBaselineAction(_prev: ActionState): Promise<ActionSta
   if (!status.instrument) return { ok: false, message: '尚未設定行情來源。' };
   const latest = await deps.store.getLatestSnapshot({ source: deps.provider.id, symbol: status.instrument.symbol });
   const now = deps.now();
-  if (!latest || isStale(latest.quoteTimestamp, now, status.staleAfterMinutes)) {
+  // 跟畫面一樣依查價時間表判斷：兩次查價之間的最新報價仍可當基準
+  if (!latest || assessQuote(latest, settings, now, status.staleAfterMinutes).state !== 'current') {
     await deps.store.updateSettings({ baselinePrice: null, baselineTimestamp: null, baselineDate: null });
     return done('目前沒有有效的最新報價；下一筆有效報價會成為新基準。');
   }

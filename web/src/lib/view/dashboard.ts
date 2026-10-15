@@ -1,7 +1,7 @@
 import 'server-only';
 import { computeChange, type PriceChange } from '../gold/math';
 import type { ProviderStatus } from '../gold/types';
-import { isStale } from '../gold/validate';
+import { assessQuote, nextScheduledCheck, type QuoteFreshness } from '../freshness';
 import type { JobDeps } from '../jobs/deps';
 import { computeQuotaState, type QuotaState } from '../quota/guard';
 import type { ProviderBudget } from '../gold/budget';
@@ -38,7 +38,11 @@ export interface DashboardData {
   instrument: InstrumentKey | null;
   settings: SettingsRow;
   latest: SnapshotRow | null;
+  /** 最新報價已不是最新（來源沒更新或排程漏查）；兩次查價之間不算 */
   stale: boolean;
+  freshness: QuoteFreshness | null;
+  /** 下一次預定查價（每日推播或盤中檢查，取較早的） */
+  nextCheckAt: Date | null;
   reference: SnapshotRow | null;
   change: PriceChange | null;
   gauge: Gauge | null;
@@ -80,7 +84,9 @@ export async function loadDashboard(deps: JobDeps): Promise<DashboardData> {
   const recipients = Math.max(1, recipientCount);
 
   // 第二批：需要第一批結果的查詢
-  const stale = latest ? isStale(latest.quoteTimestamp, now, provider.staleAfterMinutes) : false;
+  // 依查價時間表判斷：兩次查價之間沿用上一次的報價是正常的，只有來源沒更新或排程漏查才算過期
+  const freshness = latest ? assessQuote(latest, settings, now, provider.staleAfterMinutes) : null;
+  const stale = freshness !== null && freshness.state !== 'current';
   const [reference, providerBudget] = await Promise.all([
     // 「今日漲跌」= 最新報價 vs 最新報價那天之前的有效交易日
     instrument && latest ? store.getPreviousDailySnapshot(instrument, taipeiDate(latest.quoteTimestamp)) : Promise.resolve(null),
@@ -134,6 +140,8 @@ export async function loadDashboard(deps: JobDeps): Promise<DashboardData> {
     settings,
     latest,
     stale,
+    freshness,
+    nextCheckAt: nextScheduledCheck(settings, now, lastIntradayRun?.startedAt ?? null),
     reference,
     change,
     gauge,
