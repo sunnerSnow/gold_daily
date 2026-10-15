@@ -74,5 +74,29 @@
 /* 設定頁的走勢圖預覽（跟 LINE 收到的是同一張） */
 .msg-chart { display: block; width: 100%; height: auto; margin-top: 12px; border-radius: 12px; border: 1px solid var(--line); }
 
+/* 寬表格在手機改成「一筆一張」：第一格當標題，其他每格一行「欄位名稱　內容」，不用橫向滑動也不會切到。
+   每格用 data-label 帶欄位名稱；桌機維持原本的表格。 */
+@media (max-width: 640px) {
+  .table-wrap:has(> .tbl--stack) { overflow: visible; margin: 0; padding: 0; }
+  .tbl--stack, .tbl--stack tbody { display: block; min-width: 0; }
+  .tbl--stack thead { display: none; }
+  .tbl--stack tr { display: block; padding: 12px 0; border-bottom: 1px solid var(--line-3); }
+  .tbl--stack tr:last-child { border-bottom: 0; }
+  .tbl--stack td {
+    display: grid; grid-template-columns: auto minmax(0, 1fr); column-gap: 16px;
+    align-items: baseline; justify-items: end; text-align: right;
+    padding: 3px 0; border: 0;
+  }
+  .tbl--stack td::before {
+    content: attr(data-label); grid-column: 1; grid-row: 1 / span 4; justify-self: start; align-self: start;
+    color: var(--ink-3); font-size: 13px; font-family: var(--sans); white-space: nowrap;
+  }
+  .tbl--stack td.tbl__title { display: block; text-align: left; font-weight: 700; font-size: 15px; padding-bottom: 6px; }
+  .tbl--stack td.tbl__title::before { content: none; }
+  .tbl--stack td.tbl__title .cell-note { display: inline; margin: 0 0 0 8px; font-weight: 500; }
+  .tbl--stack tr.is-gap { background: var(--gap-row); border-radius: 12px; padding: 12px; margin: 4px 0; border-bottom: 0; }
+  .tbl--stack tr.is-gap td { background: none; }
+}
+
 /* 說明文字裡的長路徑、事件鍵（沒有空白可斷行）在手機上要能斷開 */
 .caption, .cell-note, .help, .note, .flash { overflow-wrap: anywhere; }

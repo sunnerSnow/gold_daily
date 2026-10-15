@@ -200,7 +200,7 @@ function Dashboard({ data }: { data: DashboardData }) {
               </div>
             ) : (
               <div className="table-wrap">
-                <table className="tbl tbl--events">
+                <table className="tbl tbl--events tbl--stack">
                   <thead>
                     <tr><th>觸發時間</th><th>方向</th><th className="r">價格</th><th className="r">相對基準</th><th>門檻</th><th>發送狀態</th></tr>
                   </thead>
@@ -210,24 +210,24 @@ function Dashboard({ data }: { data: DashboardData }) {
                         const above = (e.currentPrice ?? 0) >= (e.baselinePrice ?? 0);
                         return (
                           <tr key={e.id}>
-                            <td className="num nowrap">{formatTaipei(e.createdAt, false).slice(5)}</td>
-                            <td className="nowrap">◎ 到價</td>
-                            <td className="num r">{formatPrice(e.currentPrice)}</td>
-                            <td className="num r soft">—</td>
-                            <td className="nowrap">{above ? '≥' : '≤'} {formatPrice(e.baselinePrice)}</td>
-                            <td><EventStatusChip event={e} /><span className="cell-note">{eventNote(e)}</span></td>
+                            <td className="num nowrap tbl__title">{formatTaipei(e.createdAt, false).slice(5)}</td>
+                            <td className="nowrap" data-label="方向">◎ 到價</td>
+                            <td className="num r" data-label="價格">{formatPrice(e.currentPrice)}</td>
+                            <td className="num r soft" data-label="相對基準">—</td>
+                            <td className="nowrap" data-label="門檻">{above ? '≥' : '≤'} {formatPrice(e.baselinePrice)}</td>
+                            <td data-label="發送狀態"><EventStatusChip event={e} /><span className="cell-note">{eventNote(e)}</span></td>
                           </tr>
                         );
                       }
                       const dirUp = e.eventType === 'alert_up';
                       return (
                         <tr key={e.id}>
-                          <td className="num nowrap">{formatTaipei(e.createdAt, false).slice(5)}</td>
-                          <td className={`nowrap ${dirUp ? 'up' : 'down'}`}>{dirUp ? '▲ 上漲' : '▼ 下跌'}</td>
-                          <td className="num r">{formatPrice(e.currentPrice)}</td>
-                          <td className={`num r ${dirUp ? 'up' : 'down'}`}>{formatPercent(e.changePercent)}</td>
-                          <td className="nowrap">{dirUp ? '上漲' : '下跌'} ≥ {e.thresholdPercent}%</td>
-                          <td><EventStatusChip event={e} /><span className="cell-note">{eventNote(e)}</span></td>
+                          <td className="num nowrap tbl__title">{formatTaipei(e.createdAt, false).slice(5)}</td>
+                          <td className={`nowrap ${dirUp ? 'up' : 'down'}`} data-label="方向">{dirUp ? '▲ 上漲' : '▼ 下跌'}</td>
+                          <td className="num r" data-label="價格">{formatPrice(e.currentPrice)}</td>
+                          <td className={`num r ${dirUp ? 'up' : 'down'}`} data-label="相對基準">{formatPercent(e.changePercent)}</td>
+                          <td className="nowrap" data-label="門檻">{dirUp ? '上漲' : '下跌'} ≥ {e.thresholdPercent}%</td>
+                          <td data-label="發送狀態"><EventStatusChip event={e} /><span className="cell-note">{eventNote(e)}</span></td>
                         </tr>
                       );
                     })}

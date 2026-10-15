@@ -79,7 +79,7 @@ export default async function HistoryPage({ searchParams }: { searchParams: Prom
             </div>
           ) : (
             <div className="table-wrap">
-              <table className="tbl tbl--history">
+              <table className="tbl tbl--history tbl--stack">
                 <thead>
                   <tr>
                     <th>日期</th>
@@ -96,13 +96,13 @@ export default async function HistoryPage({ searchParams }: { searchParams: Prom
                     const tone = r.changeAmount === null ? 'soft' : r.changeAmount >= 0 ? 'up' : 'down';
                     return (
                       <tr key={`${r.kind}-${r.date}`} className={r.kind === 'missing' ? 'is-gap' : undefined}>
-                        <td className="num nowrap">{formatDateLabel(r.date)}</td>
-                        <td className="num r">{formatPrice(r.price)}</td>
-                        <td className={`num r ${tone}`}>{formatSigned(r.changeAmount)}</td>
-                        <td className={`num r ${tone}`}>{formatPercent(r.changePercent)}</td>
-                        <td>{r.source}</td>
-                        <td className="num soft nowrap">{r.quoteTimestamp ? formatTaipei(r.quoteTimestamp).slice(5) : '來源未更新'}</td>
-                        <td>
+                        <td className="num nowrap tbl__title">{formatDateLabel(r.date)}</td>
+                        <td className="num r" data-label="黃金價格">{formatPrice(r.price)}</td>
+                        <td className={`num r ${tone}`} data-label="漲跌金額">{formatSigned(r.changeAmount)}</td>
+                        <td className={`num r ${tone}`} data-label="漲跌幅">{formatPercent(r.changePercent)}</td>
+                        <td data-label="資料來源">{r.source}</td>
+                        <td className="num soft nowrap" data-label="報價時間">{r.quoteTimestamp ? formatTaipei(r.quoteTimestamp).slice(5) : '來源未更新'}</td>
+                        <td data-label="資料狀態">
                           {r.kind === 'missing' ? (
                             <span className="chip chip--err">未取得有效報價</span>
                           ) : r.kind === 'noref' ? (

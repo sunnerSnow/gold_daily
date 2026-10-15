@@ -203,7 +203,7 @@ export default async function StatusPage({ searchParams }: { searchParams: Promi
             <div><dt>官方可用額度</dt><dd>{quota.officialLimit !== null ? `${quota.officialLimit} 則` : quota.verified ? '官方回報無上限，以設定額度為準' : '尚未取得'}</dd></div>
             <div><dt>本月已使用（LINE 官方）</dt><dd>{quota.officialUsed !== null ? `${quota.officialUsed} 則` : '尚未取得'}<span className="cell-note">官方數字為概略值，含其他管道送出的訊息</span></dd></div>
             <div><dt>本地估算剩餘</dt><dd>{quota.localRemaining} 則<span className="cell-note">設定額度 {settings.monthlyMessageQuota} − 本系統已送出</span></dd></div>
-            <div><dt>每日推播保留</dt><dd>{quota.reserveForDaily} 則<span className="cell-note">本月剩餘天數 × 1 ＋ 緩衝 {settings.quotaSafetyBuffer}</span></dd></div>
+            <div><dt>每日推播保留</dt><dd>{quota.reserveForDaily} 則<span className="cell-note">本月剩餘天數 × 推播人數 {Math.max(1, deps.line.recipientCount)} ＋ 緩衝 {settings.quotaSafetyBuffer}</span></dd></div>
             <div><dt>最近同步</dt><dd className="num">{lastSyncAny ? formatTaipei(lastSyncAny.syncedAt) : '—'}<span className="cell-note">{lastSyncAny ? (lastSyncAny.success ? '成功' : `失敗：${lastSyncAny.errorMessage ?? ''}`) : envStatus.line ? '尚未同步' : 'LINE 尚未連線'}</span></dd></div>
             <div><dt>額度重置</dt><dd>每月 1 日（日本時間）<span className="cell-note">台灣時間月底最後一天 23:00 之後送出的算下個月</span></dd></div>
           </dl>
@@ -259,22 +259,22 @@ export default async function StatusPage({ searchParams }: { searchParams: Promi
             <h2 className="card-title" id="cost-h">服務與費用</h2>
           </div>
           <div className="table-wrap">
-            <table className="tbl tbl--costs">
+            <table className="tbl tbl--costs tbl--stack">
               <thead>
                 <tr><th>服務</th><th>用途</th><th>方案</th><th>費用</th><th>備註</th></tr>
               </thead>
               <tbody>
-                <tr><td>LINE 官方帳號</td><td>每日推播、異動提醒</td><td>{PLAN_LABEL[settings.linePlan] ?? settings.linePlan}</td><td>{settings.linePlan === 'light_free' ? 'NT$0（每月 200 則，用完無法加購）' : '依 LINE 當期價格'}</td><td className="soft">2026/11/1 起：中用量 NT$1,000／月（3,000 則）、高用量 NT$1,400／月（6,000 則，可加購）；未稅</td></tr>
-                <tr><td>Supabase</td><td>資料庫、排程（pg_cron）</td><td className="soft">{envStatus.supabase ? '[請填入方案]' : '尚未設定'}</td><td className="soft">[待確認]</td><td className="soft">免費方案 7 天沒有活動會暫停；每 15 分鐘的排程呼叫可維持活動</td></tr>
-                <tr><td>Vercel</td><td>網站、每日排程備援</td><td className="soft">[請填入方案]</td><td className="soft">[待確認]</td><td className="soft">Hobby 的 Cron 一天一次、只精確到小時；Pro 為 US$20／月</td></tr>
+                <tr><td className="tbl__title">LINE 官方帳號</td><td data-label="用途">每日推播、異動提醒</td><td data-label="方案">{PLAN_LABEL[settings.linePlan] ?? settings.linePlan}</td><td data-label="費用">{settings.linePlan === 'light_free' ? 'NT$0（每月 200 則，用完無法加購）' : '依 LINE 當期價格'}</td><td className="soft" data-label="備註">2026/11/1 起：中用量 NT$1,000／月（3,000 則）、高用量 NT$1,400／月（6,000 則，可加購）；未稅</td></tr>
+                <tr><td className="tbl__title">Supabase</td><td data-label="用途">資料庫、排程（pg_cron）</td><td className="soft" data-label="方案">{envStatus.supabase ? '[請填入方案]' : '尚未設定'}</td><td className="soft" data-label="費用">[待確認]</td><td className="soft" data-label="備註">免費方案 7 天沒有活動會暫停；每 15 分鐘的排程呼叫可維持活動</td></tr>
+                <tr><td className="tbl__title">Vercel</td><td data-label="用途">網站、每日排程備援</td><td className="soft" data-label="方案">[請填入方案]</td><td className="soft" data-label="費用">[待確認]</td><td className="soft" data-label="備註">Hobby 的 Cron 一天一次、只精確到小時；Pro 為 US$20／月</td></tr>
                 <tr>
-                  <td>行情 API</td>
-                  <td>正式報價</td>
-                  <td>{provider.configured && !provider.isMock ? `${provider.name}${provider.monthlyCallQuota === 100 ? '（Sandbox 免費方案）' : ''}` : '尚未設定'}</td>
-                  <td>{provider.id === 'goldapi' ? 'US$0（每月 100 次）' : <span className="soft">[待確認]</span>}</td>
-                  <td className="soft">{provider.id === 'goldapi' ? '付費方案 US$99／月不限次數；本系統不會自動升級' : '選定後補上方案與費用'}</td>
+                  <td className="tbl__title">行情 API</td>
+                  <td data-label="用途">正式報價</td>
+                  <td data-label="方案">{provider.configured && !provider.isMock ? `${provider.name}${provider.monthlyCallQuota === 100 ? '（Sandbox 免費方案）' : ''}` : '尚未設定'}</td>
+                  <td data-label="費用">{provider.id === 'goldapi' ? 'US$0（每月 100 次）' : <span className="soft">[待確認]</span>}</td>
+                  <td className="soft" data-label="備註">{provider.id === 'goldapi' ? '付費方案 US$99／月不限次數；本系統不會自動升級' : '選定後補上方案與費用'}</td>
                 </tr>
-                <tr><td>Mock Provider</td><td>開發與測試</td><td>—</td><td>無</td><td className="soft">資料皆為模擬</td></tr>
+                <tr><td className="tbl__title">Mock Provider</td><td data-label="用途">開發與測試</td><td data-label="方案">—</td><td data-label="費用">無</td><td className="soft" data-label="備註">資料皆為模擬</td></tr>
               </tbody>
             </table>
           </div>
@@ -327,20 +327,20 @@ export default async function StatusPage({ searchParams }: { searchParams: Promi
             <p className="small soft">還沒有排程紀錄。</p>
           ) : (
             <div className="table-wrap">
-              <table className="tbl tbl--jobs">
+              <table className="tbl tbl--jobs tbl--stack">
                 <thead>
                   <tr><th>工作</th><th>開始</th><th>結束</th><th className="r">耗時</th><th>狀態</th><th className="r">處理筆數</th><th>說明</th></tr>
                 </thead>
                 <tbody>
                   {runs.map((r) => (
                     <tr key={r.id}>
-                      <td>{jobLabel(r.jobType)}<span className="cell-note num">{r.trigger === 'manual' ? '手動' : 'cron'}</span></td>
-                      <td className="num nowrap">{formatTaipei(r.startedAt).slice(5)}</td>
-                      <td className="num nowrap">{r.finishedAt ? formatTaipeiTime(r.finishedAt) : '—'}</td>
-                      <td className="num r">{r.finishedAt ? `${((r.finishedAt.getTime() - r.startedAt.getTime()) / 1000).toFixed(1)} 秒` : '—'}</td>
-                      <td><JobStatusChip run={r} /></td>
-                      <td className="num r">{r.recordsProcessed}</td>
-                      <td>{r.errorMessage ? <span style={{ color: 'var(--err)' }}>{r.errorMessage}</span> : null}{r.detail ? <span className="cell-note">{r.detail}</span> : null}</td>
+                      <td className="tbl__title">{jobLabel(r.jobType)}<span className="cell-note num">{r.trigger === 'manual' ? '手動' : 'cron'}</span></td>
+                      <td className="num nowrap" data-label="開始">{formatTaipei(r.startedAt).slice(5)}</td>
+                      <td className="num nowrap" data-label="結束">{r.finishedAt ? formatTaipeiTime(r.finishedAt) : '—'}</td>
+                      <td className="num r" data-label="耗時">{r.finishedAt ? `${((r.finishedAt.getTime() - r.startedAt.getTime()) / 1000).toFixed(1)} 秒` : '—'}</td>
+                      <td data-label="狀態"><JobStatusChip run={r} /></td>
+                      <td className="num r" data-label="處理筆數">{r.recordsProcessed}</td>
+                      <td data-label="說明">{r.errorMessage ? <span style={{ color: 'var(--err)' }}>{r.errorMessage}</span> : null}{r.detail ? <span className="cell-note">{r.detail}</span> : null}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -358,19 +358,19 @@ export default async function StatusPage({ searchParams }: { searchParams: Promi
             <p className="small soft">還沒有通知事件。</p>
           ) : (
             <div className="table-wrap">
-              <table className="tbl tbl--jobs">
+              <table className="tbl tbl--jobs tbl--stack">
                 <thead>
                   <tr><th>時間</th><th>類型</th><th>事件鍵</th><th className="r">嘗試次數</th><th>狀態</th><th>操作</th></tr>
                 </thead>
                 <tbody>
                   {events.map((e) => (
                     <tr key={e.id}>
-                      <td className="num nowrap">{formatTaipei(e.createdAt).slice(5)}</td>
-                      <td>{EVENT_LABEL[e.eventType]}</td>
-                      <td className="num small">{e.idempotencyKey.length > 40 ? `${e.idempotencyKey.slice(0, 40)}…` : e.idempotencyKey}</td>
-                      <td className="num r">{e.attemptCount}</td>
-                      <td><EventStatusChip event={e} /><span className="cell-note">{eventNote(e)}</span></td>
-                      <td>{canRetry(e, now) ? <ActionButton action={retryEventAction} fields={{ eventId: String(e.id) }} label="重試" variant="small" /> : <span className="small soft">—</span>}</td>
+                      <td className="num nowrap tbl__title">{formatTaipei(e.createdAt).slice(5)}</td>
+                      <td data-label="類型">{EVENT_LABEL[e.eventType]}</td>
+                      <td className="num small" data-label="事件鍵">{e.idempotencyKey.length > 40 ? `${e.idempotencyKey.slice(0, 40)}…` : e.idempotencyKey}</td>
+                      <td className="num r" data-label="嘗試次數">{e.attemptCount}</td>
+                      <td data-label="狀態"><EventStatusChip event={e} /><span className="cell-note">{eventNote(e)}</span></td>
+                      <td data-label="操作">{canRetry(e, now) ? <ActionButton action={retryEventAction} fields={{ eventId: String(e.id) }} label="重試" variant="small" /> : <span className="small soft">—</span>}</td>
                     </tr>
                   ))}
                 </tbody>
