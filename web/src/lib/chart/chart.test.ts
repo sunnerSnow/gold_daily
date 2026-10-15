@@ -126,6 +126,12 @@ describe('走勢圖網址', () => {
     expect(chartImageUrl(null, '2026-10-14')).toBeNull();
   });
 
+  it('卡片用精簡版網址', () => {
+    expect(chartImageUrl('https://gold.example', '2026-10-14', 'compact')).toBe('https://gold.example/api/chart/2026-10-14-compact.png');
+    expect(CHART_FILE_PATTERN.exec('2026-10-14-compact.png')?.slice(1, 3)).toEqual(['2026-10-14', '-compact']);
+    expect(CHART_FILE_PATTERN.test('2026-10-14-small.png')).toBe(false);
+  });
+
   it('只接受 YYYY-MM-DD.png', () => {
     expect(CHART_FILE_PATTERN.exec('2026-10-14.png')?.[1]).toBe('2026-10-14');
     for (const bad of ['2026-10-14', '2026-10-14.jpg', '../2026-10-14.png', '2026-1-4.png', 'x2026-10-14.png']) {

@@ -57,8 +57,8 @@ describe('GoldAPI 真實回應（2026-10-14）', () => {
     const provider = new GoldApiProvider({ apiKey: 'k', instrument: INSTRUMENT, fetchImpl: f.impl, now: w.clock.now });
     const r = await runDailyJob({ ...w.deps(), provider }, { trigger: 'cron' });
     expect(r.status).toBe('success');
-    const text = w.line.pushes[0].text;
-    expect(text.startsWith('🥇 黃金每日行情\n2026/10/14（三）・台灣時間')).toBe(true);
+    const text = (await w.store.getEventByKey('daily:2026-10-14'))!.messageText!;
+    expect(text.startsWith('💰黃金每日行情\n2026/10/14（三）\n')).toBe(true);
     expect(text).not.toContain('模擬');
     // GoldAPI 的 XAUUSD 才會標成國際現貨黃金
     expect(text).toContain('國際現貨黃金\n4,166.16 USD / 金衡盎司');
@@ -66,7 +66,10 @@ describe('GoldAPI 真實回應（2026-10-14）', () => {
     expect(text).toContain('前一交易日：4,182.45 USD');
     expect(text).toContain('資料來源：GoldAPI.io');
     expect(text).toContain('資料狀態：有效');
-    expect(text).toContain('📉 本次報價較前一交易日下跌 0.39%。');
+    // 實際推播的是卡片，數字跟文字一樣
+    const card = w.line.pushes[0].card!;
+    expect(card.altText).toBe('💰黃金每日行情 4,166.16 USD ▼0.39%');
+    expect(JSON.stringify(card)).toContain('▼ −16.29 USD（−0.39%）');
     expect(f.calls).toHaveLength(2);
     expect(await w.store.countProviderCalls('goldapi', new Date('2026-10-01T00:00:00Z'))).toBe(2);
   });

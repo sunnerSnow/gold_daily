@@ -59,7 +59,51 @@ describe('排程 API 路由', () => {
   });
 });
 
+describe('LINE webhook 路由', () => {
+  afterEach(() => vi.unstubAllEnvs());
+  beforeEach(() => {
+    // 不給 access token：就算簽章正確也不會呼叫真的 LINE 回覆
+    for (const key of ['LINE_CHANNEL_ACCESS_TOKEN', 'LINE_USER_ID', 'SUPABASE_URL', 'SUPABASE_SERVICE_ROLE_KEY']) vi.stubEnv(key, '');
+  });
+  const post = async (body: string, signature?: string) => {
+    vi.resetModules();
+    const { POST } = await import('@/app/api/line/webhook/route');
+    return POST(new Request('https://example.test/api/line/webhook', { method: 'POST', body, headers: signature ? { 'x-line-signature': signature } : {} }));
+  };
+
+  it('沒設定 LINE_CHANNEL_SECRET 時一律拒絕', async () => {
+    vi.stubEnv('LINE_CHANNEL_SECRET', '');
+    expect((await post('{"events":[]}')).status).toBe(503);
+  });
+
+  it('簽章錯誤回 401；簽章正確回 200（後台的 Verify 也是這樣）', async () => {
+    const secret = 'channel-secret-for-route-test';
+    vi.stubEnv('LINE_CHANNEL_SECRET', secret);
+    const body = JSON.stringify({ destination: 'x', events: [] });
+    const { createHmac } = await import('node:crypto');
+    const sig = createHmac('sha256', secret).update(body).digest('base64');
+    expect((await post(body)).status).toBe(401);
+    expect((await post(body, sig.replace(/.$/, sig.endsWith('A') ? 'B' : 'A'))).status).toBe(401);
+    expect((await post(body, sig)).status).toBe(200);
+  });
+});
+
 describe('環境變數檢查', () => {
+  it('LINE_USER_ID 可以填多個（逗號分隔），重複的只算一次', async () => {
+    const { parseLineUserIds } = await import('../env');
+    const a = `U${'a'.repeat(32)}`;
+    const b = `U${'b'.repeat(32)}`;
+    expect(parseLineUserIds(`${a}, ${b},${a}`)).toEqual([a, b]);
+    expect(parseLineUserIds(`${a}，${b}`)).toEqual([a, b]);
+    expect(parseLineUserIds(undefined)).toEqual([]);
+    const ok = checkEnv(readEnv({ LINE_CHANNEL_ACCESS_TOKEN: 'token', LINE_USER_ID: `${a},${b}` }));
+    expect(ok.line).toBe(true);
+    const bad = checkEnv(readEnv({ LINE_CHANNEL_ACCESS_TOKEN: 'token', LINE_USER_ID: `${a},U123` }));
+    expect(bad.line).toBe(false);
+    expect(bad.issues.find((i) => i.key === 'LINE_USER_ID')?.message).toContain('第 2 個');
+    expect(JSON.stringify(bad)).not.toContain(a);
+  });
+
   it('缺少 LINE 設定時明確列出，且 LINE 視為未連線', () => {
     const s = checkEnv(readEnv({ GOLD_PRICE_PROVIDER: 'mock' }));
     expect(s.line).toBe(false);

@@ -1,12 +1,11 @@
 import { CHART_DAYS, chartImageUrl } from '../chart/daily-chart';
 import { computeChange } from '../gold/math';
-import { isStale } from '../gold/validate';
-import { formatDailyMessage } from '../line/messages';
+import { buildDailyCard, type FlexMessage } from '../line/flex';
+import { formatDailyMessage, type DailyMessageInput } from '../line/messages';
 import type { InstrumentKey, SnapshotRow } from '../store/types';
-import { taipeiDate } from '../time';
 import type { JobDeps } from './deps';
 
-// 走勢圖與每日訊息預覽用的資料。只讀資料庫裡的每日快照，不呼叫行情來源。
+// 走勢圖、每日卡片與每日訊息預覽用的資料。只讀資料庫裡的每日快照，不呼叫行情來源。
 
 function currentInstrument(deps: JobDeps): InstrumentKey | null {
   const instrument = deps.provider.getProviderStatus().instrument;
@@ -27,14 +26,57 @@ export async function loadChartSnapshots(deps: JobDeps, date: string): Promise<{
   return { instrument, rows: same.reverse() };
 }
 
-/** 每日推播要附的走勢圖網址；沒有公開網址或資料不足時回傳 null（照常只送文字） */
+/** 每日卡片裡的走勢圖（精簡版）網址；沒有公開網址或資料不足時回傳 null（卡片照常送，只是沒有圖） */
 export async function dailyChartUrl(deps: JobDeps, date: string): Promise<string | null> {
-  const url = chartImageUrl(deps.appUrl, date);
+  const url = chartImageUrl(deps.appUrl, date, 'compact');
   if (!url) return null;
   try {
     return (await loadChartSnapshots(deps, date)) ? url : null;
   } catch {
-    // 圖片只是附加內容，查不到資料也不能擋住文字推播
+    // 圖片只是附加內容，查不到資料也不能擋住推播
+    return null;
+  }
+}
+
+/**
+ * 從資料庫重建某天的每日訊息資料：那天的每日快照＋前一筆每日快照。
+ * 跟每日排程產生訊息時用的是同一組資料（findReference 也是取前一筆每日快照），所以補送、重試的數字跟原本一樣。
+ * 每日快照只會由有效（未過期）的報價寫入，所以這裡一律不是過期資料。
+ */
+export async function dailyMessageInput(deps: JobDeps, date: string): Promise<{ input: DailyMessageInput; snapshot: SnapshotRow } | null> {
+  const instrument = currentInstrument(deps);
+  if (!instrument) return null;
+  const snapshot = await deps.store.getDailySnapshot(instrument, date);
+  if (!snapshot) return null;
+  const prev = await deps.store.getPreviousDailySnapshot(instrument, date);
+  const change = computeChange(snapshot.price, prev?.price);
+  return {
+    snapshot,
+    input: {
+      price: snapshot.price,
+      symbol: snapshot.symbol,
+      currency: snapshot.currency,
+      unit: snapshot.unit,
+      referencePrice: prev?.price ?? null,
+      changeAmount: change?.amount ?? null,
+      changePercent: change?.percent ?? null,
+      timestamp: snapshot.quoteTimestamp,
+      source: snapshot.source,
+      status: snapshot.status,
+      stale: false,
+    },
+  };
+}
+
+/** 某天的每日卡片（含精簡版走勢圖）；那天沒有每日快照時回傳 null，由呼叫端改送純文字 */
+export async function dailyCard(deps: JobDeps, date: string): Promise<{ card: FlexMessage; withChart: boolean } | null> {
+  try {
+    const data = await dailyMessageInput(deps, date);
+    if (!data) return null;
+    const chartUrl = await dailyChartUrl(deps, date);
+    const card = buildDailyCard(data.input, chartUrl);
+    return card ? { card, withChart: chartUrl !== null } : null;
+  } catch {
     return null;
   }
 }
@@ -53,24 +95,7 @@ export async function latestDailyPreview(deps: JobDeps): Promise<DailyPreview | 
   if (!instrument) return null;
   const latest = (await deps.store.listDailySnapshots({ instrument, limit: 1 })).rows[0] ?? null;
   if (!latest?.dailyDate) return null;
-  const [prev, chart] = await Promise.all([
-    deps.store.getPreviousDailySnapshot(instrument, latest.dailyDate),
-    loadChartSnapshots(deps, latest.dailyDate),
-  ]);
-  const change = computeChange(latest.price, prev?.price);
-  const now = deps.now();
-  const text = formatDailyMessage({
-    price: latest.price,
-    symbol: latest.symbol,
-    currency: latest.currency,
-    unit: latest.unit,
-    referencePrice: prev?.price ?? null,
-    changeAmount: change?.amount ?? null,
-    changePercent: change?.percent ?? null,
-    timestamp: latest.quoteTimestamp,
-    source: latest.source,
-    status: latest.status,
-    stale: isStale(latest.quoteTimestamp, now, deps.provider.getProviderStatus().staleAfterMinutes) && latest.dailyDate === taipeiDate(now),
-  });
-  return { text, date: latest.dailyDate, snapshot: latest, chartAvailable: chart !== null };
+  const [data, chart] = await Promise.all([dailyMessageInput(deps, latest.dailyDate), loadChartSnapshots(deps, latest.dailyDate)]);
+  if (!data) return null;
+  return { text: formatDailyMessage(data.input), date: latest.dailyDate, snapshot: data.snapshot, chartAvailable: chart !== null };
 }

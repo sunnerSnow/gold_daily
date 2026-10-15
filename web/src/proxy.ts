@@ -25,6 +25,6 @@ export async function proxy(request: NextRequest) {
 }
 
 export const config = {
-  // 網站圖示要讓登入頁、加到主畫面時也拿得到；走勢圖要讓 LINE 的伺服器抓得到。這些都不經過登入檢查
-  matcher: ['/((?!login|api/cron|api/chart|_next/static|_next/image|favicon.ico|apple-icon).*)'],
+  // 網站圖示要讓登入頁、加到主畫面時也拿得到；走勢圖與 webhook 要讓 LINE 的伺服器連得到（webhook 自己驗簽章）。這些都不經過登入檢查
+  matcher: ['/((?!login|api/cron|api/chart|api/line|_next/static|_next/image|favicon.ico|apple-icon).*)'],
 };

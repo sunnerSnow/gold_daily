@@ -26,7 +26,10 @@ const schema = z.object({
   SUPABASE_ANON_KEY: optionalText,
   SUPABASE_SERVICE_ROLE_KEY: optionalText,
   LINE_CHANNEL_ACCESS_TOKEN: optionalText,
+  /** 推播名單：一個或多個 LINE User ID，用逗號分隔 */
   LINE_USER_ID: optionalText,
+  /** 只有 webhook（好友傳「ID」取得自己的 User ID）需要，用來驗證請求真的來自 LINE */
+  LINE_CHANNEL_SECRET: optionalText,
   GOLD_PRICE_PROVIDER: optionalText,
   GOLD_PRICE_API_KEY: optionalText,
   CRON_SECRET: optionalText,
@@ -58,6 +61,16 @@ export interface EnvStatus {
 
 const LINE_USER_ID_PATTERN = /^U[0-9a-f]{32}$/;
 
+/** LINE_USER_ID 可以填多個，用逗號（或空白）分隔；重複的只算一次 */
+export function parseLineUserIds(value: string | undefined): string[] {
+  if (!value) return [];
+  return [...new Set(value.split(/[\s,，]+/).filter(Boolean))];
+}
+
+export function isLineUserId(value: string): boolean {
+  return LINE_USER_ID_PATTERN.test(value);
+}
+
 export function readEnv(source: Record<string, string | undefined> = process.env): AppEnv {
   return schema.parse(source);
 }
@@ -80,12 +93,15 @@ export function checkEnv(env: AppEnv): EnvStatus {
   }
 
   const hasToken = Boolean(env.LINE_CHANNEL_ACCESS_TOKEN);
-  const hasUser = Boolean(env.LINE_USER_ID);
+  const userIds = parseLineUserIds(env.LINE_USER_ID);
+  const hasUser = userIds.length > 0;
   let line = hasToken && hasUser;
   if (!hasToken) issues.push({ key: 'LINE_CHANNEL_ACCESS_TOKEN', message: '缺少 LINE_CHANNEL_ACCESS_TOKEN，LINE 尚未連線。' });
   if (!hasUser) issues.push({ key: 'LINE_USER_ID', message: '缺少 LINE_USER_ID，LINE 尚未連線。' });
-  if (hasUser && !LINE_USER_ID_PATTERN.test(env.LINE_USER_ID!)) {
-    issues.push({ key: 'LINE_USER_ID', message: 'LINE_USER_ID 格式不正確（應為 U 開頭加 32 個十六進位字元）。' });
+  const badIds = userIds.map((id, i) => (isLineUserId(id) ? 0 : i + 1)).filter(Boolean);
+  if (badIds.length) {
+    const which = userIds.length > 1 ? `第 ${badIds.join('、')} 個` : '';
+    issues.push({ key: 'LINE_USER_ID', message: `LINE_USER_ID ${which}格式不正確（應為 U 開頭加 32 個十六進位字元，多個用逗號分隔）。` });
     line = false;
   }
 

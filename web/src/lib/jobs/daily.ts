@@ -1,12 +1,13 @@
 import { computeChange } from '../gold/math';
-import { formatDailyMessage } from '../line/messages';
+import { buildDailyCard, type FlexMessage } from '../line/flex';
+import { formatDailyMessage, type DailyMessageInput } from '../line/messages';
 import { isDailyDay } from '../schedule';
 import type { EventRow, InstrumentKey, JobTrigger, SettingsRow, SnapshotRow } from '../store/types';
 import { formatAge, parseHhmm, startOfTaipeiDay, taipeiDate, taipeiMinutesOfDay } from '../time';
 import { ensureBaseline, evaluateAndNotify } from './alerts';
-import { dailyChartUrl } from './chart-data';
+import { dailyCard, dailyChartUrl } from './chart-data';
 import { safeErrorMessage, type JobDeps, type JobOutcome } from './deps';
-import { CHART_DROPPED_NOTE, deliverEvent, MAX_TOTAL_ATTEMPTS, RECOVERABLE_SKIPS } from './notify';
+import { CARD_DROPPED_NOTE, deliverEvent, MAX_TOTAL_ATTEMPTS, RECOVERABLE_SKIPS } from './notify';
 import { getProviderBudget, meteredCall } from './provider-usage';
 import { fetchAndRecord } from './snapshot';
 import { evaluateTargets } from './targets';
@@ -122,12 +123,13 @@ export async function runDailyJob(deps: JobDeps, options: DailyOptions): Promise
     }
     if (existing?.messageText) {
       let event = existing;
-      let imageUrl: string | null = null;
+      let built: { card: FlexMessage; withChart: boolean } | null = null;
       if (needsDelivery(event, now, { lineConfigured: deps.line.configured, force: options.trigger === 'manual' })) {
-        imageUrl = await dailyChartUrl(deps, today);
-        event = await deliverEvent(deps, event, 'daily', settings, { imageUrl });
+        // 卡片從資料庫重建（今天的每日快照＋前一交易日），數字跟早上產生的文字一樣
+        built = await dailyCard(deps, today);
+        event = await deliverEvent(deps, event, 'daily', settings, { messages: built ? [built.card] : null });
       }
-      const detail = `補送 ${dailyKey(today)}：${describeEvent(event)}${withChart(event, imageUrl)}（沿用今天的訊息，未重新查價）`;
+      const detail = `補送 ${dailyKey(today)}：${describeEvent(event)}${deliveredAs(event, built)}（沿用今天的訊息，未重新查價）`;
       const status = event.status === 'failed' ? 'failed' : 'success';
       await deps.store.finishJobRun(run.id, { status, detail, errorMessage: event.status === 'failed' ? event.lastError : null });
       return { status, detail, jobRunId: run.id, eventIds: [event.id] };
@@ -149,7 +151,7 @@ export async function runDailyJob(deps: JobDeps, options: DailyOptions): Promise
     const reference = await findReference(deps, settings, instrument, today);
     const price = daily?.price ?? quote.price;
     const change = computeChange(price, reference?.price);
-    const messageText = formatDailyMessage({
+    const messageInput: DailyMessageInput = {
       price,
       symbol: quote.symbol,
       currency: quote.currency,
@@ -161,7 +163,9 @@ export async function runDailyJob(deps: JobDeps, options: DailyOptions): Promise
       source: quote.source,
       status: quote.status,
       stale,
-    });
+    };
+    // 純文字存在事件上（紀錄、補送失敗時的備案）；實際推播送卡片，兩者用同一組資料
+    const messageText = formatDailyMessage(messageInput);
 
     const eventIds: number[] = [];
     const detailParts: string[] = [
@@ -188,14 +192,18 @@ export async function runDailyJob(deps: JobDeps, options: DailyOptions): Promise
         messageText,
       });
       let event = inserted;
-      let imageUrl: string | null = null;
+      let built: { card: FlexMessage; withChart: boolean } | null = null;
       if (needsDelivery(event, now, { lineConfigured: deps.line.configured, force: options.trigger === 'manual' })) {
-        // 過期報價沒有寫入當天的每日快照，畫不出到今天為止的走勢圖，只送文字
-        imageUrl = daily ? await dailyChartUrl(deps, today) : null;
-        event = await deliverEvent(deps, event, 'daily', settings, { imageUrl });
+        // 過期報價沒有寫入當天的每日快照：不做卡片（補送時也重建不出來），改送純文字
+        if (daily) {
+          const chartUrl = await dailyChartUrl(deps, today);
+          const card = buildDailyCard(messageInput, chartUrl);
+          built = card ? { card, withChart: chartUrl !== null } : null;
+        }
+        event = await deliverEvent(deps, event, 'daily', settings, { messages: built ? [built.card] : null });
       }
       eventIds.push(event.id);
-      detailParts.push(`推播 ${dailyKey(today)}：${describeEvent(event)}${withChart(event, imageUrl)}`);
+      detailParts.push(`推播 ${dailyKey(today)}：${describeEvent(event)}${deliveredAs(event, built)}`);
       if (event.status === 'failed') deliveryError = event.lastError ?? 'LINE 發送失敗';
     }
 
@@ -234,10 +242,11 @@ export async function runDailyJob(deps: JobDeps, options: DailyOptions): Promise
   }
 }
 
-/** 排程紀錄裡註明這次有沒有附走勢圖 */
-function withChart(event: EventRow, imageUrl: string | null): string {
-  if (event.status !== 'sent' || !imageUrl) return '';
-  return event.lastError === CHART_DROPPED_NOTE ? '（走勢圖被 LINE 拒絕，只送文字）' : '（附走勢圖）';
+/** 排程紀錄裡註明這次是用卡片還是純文字送出 */
+function deliveredAs(event: EventRow, built: { withChart: boolean } | null): string {
+  if (event.status !== 'sent' || !built) return '';
+  if (event.lastError === CARD_DROPPED_NOTE) return '（卡片被 LINE 拒絕，改送純文字）';
+  return built.withChart ? '（卡片＋走勢圖）' : '（卡片）';
 }
 
 export function describeEvent(event: EventRow): string {

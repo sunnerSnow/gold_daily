@@ -21,6 +21,8 @@ export interface QuotaInput {
   monthlyMessageQuota: number;
   quotaSafetyBuffer: number;
   dailyEnabled: boolean;
+  /** 推播對象人數：LINE 每送給 1 人算 1 則，所以每次推播要用掉這麼多則（預設 1） */
+  recipients?: number;
 }
 
 export interface QuotaState {
@@ -41,8 +43,9 @@ export interface QuotaState {
 export function computeQuotaState(input: QuotaInput): QuotaState {
   const sync = input.latestSuccessfulSync;
   const fresh = Boolean(sync && input.now.getTime() - sync.syncedAt.getTime() <= QUOTA_SYNC_MAX_AGE_MS);
+  const perSend = Math.max(1, input.recipients ?? 1);
   const localRemaining = Math.max(0, input.monthlyMessageQuota - input.localSentThisMonth);
-  const reserveForDaily = (input.dailyEnabled ? remainingDaysInLineBillingMonth(input.now) : 0) + input.quotaSafetyBuffer;
+  const reserveForDaily = (input.dailyEnabled ? remainingDaysInLineBillingMonth(input.now) * perSend : 0) + input.quotaSafetyBuffer;
 
   if (!fresh || !sync) {
     return {
@@ -67,11 +70,13 @@ export function computeQuotaState(input: QuotaInput): QuotaState {
   const officialRemaining = Math.max(0, cap - officialUsed);
   const remaining = Math.min(officialRemaining, localRemaining);
 
-  const canDaily = remaining >= 1;
-  const canExtra = remaining - reserveForDaily >= 1;
+  // 每次推播要送給所有推播對象，剩餘則數不夠全部的人就不送（不會只送一部分人）
+  const canDaily = remaining >= perSend;
+  const canExtra = remaining - reserveForDaily >= perSend;
+  const people = perSend > 1 ? `（推播對象 ${perSend} 人，每次推播用掉 ${perSend} 則）` : '';
   let pausedReason: string | null = null;
-  if (!canDaily) pausedReason = '本月訊息額度已用完，已暫停所有推播（不會自動升級或加購）。';
-  else if (!canExtra) pausedReason = `剩餘 ${remaining} 則，需保留 ${reserveForDaily} 則給每日推播，已暫停異動提醒與測試推播。`;
+  if (!canDaily) pausedReason = `本月訊息額度已不夠送出下一次推播，已暫停所有推播（不會自動升級或加購）${people}。`;
+  else if (!canExtra) pausedReason = `剩餘 ${remaining} 則，需保留 ${reserveForDaily} 則給每日推播，已暫停異動提醒與測試推播${people}。`;
 
   return {
     verified: true,

@@ -204,13 +204,14 @@ export async function setMockScenarioAction(_prev: ActionState, formData: FormDa
 export async function testPushAction(_prev: ActionState): Promise<ActionState> {
   if (!(await isAdmin())) return DENIED;
   const deps = await buildDeps();
-  const { event, withChart } = await sendTestPush(deps);
+  const { event, withCard } = await sendTestPush(deps);
   const ok = event.status === 'sent';
   revalidatePath('/', 'layout');
+  const people = deps.line.recipientCount > 1 ? `（${deps.line.recipientCount} 人，用掉 ${deps.line.recipientCount} 則額度）` : '';
   return {
     ok,
     message: ok
-      ? `測試推播已送出${withChart ? '（含每日行情預覽與走勢圖）' : ''}，請查看 LINE。`
+      ? `測試推播已送出${withCard ? '，含每日行情卡片' : ''}${people}，請查看 LINE。`
       : `測試推播${describeEvent(event)}${event.lastError ? `：${event.lastError}` : ''}`,
   };
 }

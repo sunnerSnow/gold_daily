@@ -20,7 +20,8 @@
 | 行情來源 | `src/lib/gold/`：`GoldPriceProvider` 介面（`getLatestPrice` / `getHistoricalPrice` / `getProviderStatus`），實作有 `GoldApiProvider`（正式）與 `MockGoldPriceProvider`；未設定或不支援的來源一律顯示「尚未設定正式行情來源」，不會偷用 Mock。`budget.ts` 是查價次數保護 |
 | 資料 | `src/lib/store/`：`Store` 介面，`SupabaseStore`（正式）與 `MemoryStore`（測試、沒有 Supabase 的本機開發） |
 | LINE | `src/lib/line/`：Push API、額度查詢；重試沿用 `X-Line-Retry-Key`。訊息格式在 `messages.ts`（每日、異動、到價提醒共用同一組格式化函式） |
-| 走勢圖 | `/api/chart/<日期>.png`：用資料庫的每日快照畫近 30 個交易日，跟每日推播的文字放在同一次請求送出（LINE 只算 1 則），不會多查價。LINE 的伺服器要能直接抓，所以不需登入；只畫已存在的日期，其他網址一律 404，同一天的圖交給 CDN 快取。網址要是 https 才會附圖（本機不附）。字型是 `src/assets/fonts/` 的 Noto Sans TC 子集（SIL OFL） |
+| 走勢圖 | `/api/chart/<日期>-compact.png`（每日卡片用的精簡版）與 `/api/chart/<日期>.png`（完整版，舊訊息仍會用到）：用資料庫的每日快照畫近 30 個交易日，放在每日卡片裡（LINE 只算 1 則），不會多查價。LINE 的伺服器要能直接抓，所以不需登入；只畫已存在的日期，其他網址一律 404，同一天的圖交給 CDN 快取。網址要是 https 才會附圖（本機不附）。字型是 `src/assets/fonts/` 的 Noto Sans TC 子集（SIL OFL） |
+| LINE webhook | `/api/line/webhook`：好友傳「ID」時回覆他自己的 User ID（加入推播名單用）。用 `LINE_CHANNEL_SECRET` 驗證簽章，沒設定就一律拒絕；不保存任何 ID 或訊息 |
 | 排程工作 | `src/lib/jobs/`：每日行情 `daily.ts`、盤中檢查 `intraday.ts`、額度同步 `maintenance.ts`；只依賴介面，所以可以用假的 LINE 與記憶體資料完整測試 |
 | 排程 API | `/api/cron/daily`、`/api/cron/intraday`、`/api/cron/quota-sync`，GET / POST 都可，需 `Authorization: Bearer <CRON_SECRET>` |
 | 管理介面保護 | `src/proxy.ts`＋每個 Server Action 都再檢查一次；`ADMIN_PASSWORD`＋`SESSION_SECRET` 簽的 httpOnly cookie |
@@ -120,11 +121,26 @@ npm run lint
 
 Token 只放在伺服器端環境變數，不會出現在原始碼、前端或 API 回應；畫面只顯示「已設定」與 User ID 末 4 碼。
 
+### 推播給多人（指定名單）
+
+推播只送給 `LINE_USER_ID` 裡的人，**加了官方帳號好友不代表會收到**。多人時用逗號分隔，系統用 multicast 一次送給名單上所有人（同樣沿用 retry key 去重）。LINE 依收件人數計算額度：2 人時每次推播用掉 2 則，額度保護也會依人數保留每日推播的份量；剩餘則數不夠送給所有人時整則不送，不會只送一部分人。
+
+取得別人的 User ID（LINE 後台只看得到自己的）：
+
+1. Vercel 加上環境變數 `LINE_CHANNEL_SECRET`（Basic settings → Channel secret，存成 Sensitive）並重新部署。
+2. LINE Developers Console → **Messaging API** 分頁 → Webhook URL 填 `https://<你的網域>/api/line/webhook` → Verify → 打開 **Use webhook**。LINE Official Account Manager 的「回應設定」也要開啟 Webhook。
+3. 請對方加官方帳號好友後傳「ID」，官方帳號會回覆他自己的 User ID（回覆不算額度；系統不保存任何人的 ID 或訊息）。
+4. 把 ID 加進 Vercel 的 `LINE_USER_ID`（例如 `U你的ID,U對方的ID`）並重新部署。拿到 ID 後要關掉 webhook 也可以，不影響推播。
+
+### 每日推播的樣式
+
+每日推播是卡片（Flex Message）：漲跌上色（漲紅、跌綠），走勢圖（精簡版，`/api/chart/<日期>-compact.png`）放在文字下方、「查看黃金走勢」按鈕上方。通知列與聊天列表顯示一行摘要（例如「💰黃金每日行情 4,139.68 USD ▼0.52%」）。同樣內容的純文字存在事件上；報價過期（當天沒有每日快照）或 LINE 拒絕卡片時改送純文字。卡片在補送、手動重試時從資料庫重建，數字跟原本一樣。異動提醒與到價提醒維持純文字。
+
 ### 訊息額度與費用保護
 
 - 預設每月 200 則（可在推播設定調整成當期方案的額度）。
 - 發送前會向 LINE 查詢官方用量（`GET /v2/bot/message/quota`、`/quota/consumption`），與本地紀錄取剩餘較少的那個。官方數字是概略值，而且包含從官方帳號後台送出的訊息。
-- 每日推播優先：異動提醒與測試推播要保留「本月剩餘天數 × 1 則 ＋ 安全緩衝」。
+- 每日推播優先：異動提醒與測試推播要保留「本月剩餘天數 × 推播人數 ＋ 安全緩衝」。每次推播用掉「推播人數」則。
 - 查不到官方用量（或超過 6 小時沒同步成功）就視為額度不足，暫停推播並在畫面上顯示原因。
 - 不會自動升級方案、不會加購。LINE 回 429（可能是額度用完）不重試。
 - 計費月份用日本時間：台灣時間月底最後一天 23:00 之後送出的算下個月（[LINE 說明](https://help2.line.me/official_account_tw/ios/categoryId/20006396/3/pc?lang=zh-Hant)）。

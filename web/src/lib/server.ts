@@ -4,7 +4,7 @@ import { cookies } from 'next/headers';
 import { cache } from 'react';
 import { authMode, SESSION_COOKIE, verifySessionToken } from './auth/session';
 import { resolveAppUrl } from './chart/daily-chart';
-import { checkEnv, getEnv } from './env';
+import { checkEnv, getEnv, parseLineUserIds } from './env';
 import { createProvider } from './gold/registry';
 import type { JobDeps } from './jobs/deps';
 import { HttpLineClient, UnconfiguredLineClient } from './line/client';
@@ -28,7 +28,7 @@ export async function buildDeps(): Promise<JobDeps> {
       mockScenario: settings.mockScenario,
       mockMonthlyQuota: env.MOCK_MONTHLY_QUOTA ? Number(env.MOCK_MONTHLY_QUOTA) || null : null,
     }),
-    line: status.line ? new HttpLineClient(env.LINE_CHANNEL_ACCESS_TOKEN!, env.LINE_USER_ID!) : new UnconfiguredLineClient(),
+    line: status.line ? new HttpLineClient(env.LINE_CHANNEL_ACCESS_TOKEN!, parseLineUserIds(env.LINE_USER_ID)) : new UnconfiguredLineClient(),
     now: () => new Date(),
     sleep: (ms) => new Promise((r) => setTimeout(r, ms)),
     newId: () => randomUUID(),

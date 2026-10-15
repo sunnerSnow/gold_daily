@@ -1,6 +1,6 @@
 import { formatPercent, formatPrice, formatSigned, round } from '../gold/math';
 import { UNIT_LABEL, type PriceUnit, type QuoteStatus } from '../gold/types';
-import { formatDateLabel, formatTaipei, taipeiDate } from '../time';
+import { formatDateLabel, formatTaipei, formatTaipeiHour, taipeiDate } from '../time';
 
 // 推播訊息格式。所有數字都來自實際資料；算不出來的欄位寫「暫無有效資料」或直接省略，不填假數字。
 // 每日推播、異動提醒、到價提醒共用下面的格式化函式，各自保留需要的欄位。
@@ -69,14 +69,7 @@ export function formatChangeLine(amount: number, percent: number, currency: stri
   return `${DIRECTION_MARK[d]} ${formatSigned(amount)} ${currency}（${formatPercent(percent)}）`;
 }
 
-/** 只描述數字本身，不做預測或建議 */
-function changeSummary(amount: number, percent: number): string {
-  const d = changeDirection(amount);
-  if (d === 'flat') return '➖ 本次報價與前一交易日持平。';
-  // formatPercent 會帶正負號，這裡只要絕對值（例如 0.50%）；太小時不寫成 0.00%
-  const size = Math.abs(percent) < 0.005 ? '不到 0.01%' : ` ${formatPercent(Math.abs(percent)).slice(1)}`;
-  return d === 'up' ? `📈 本次報價較前一交易日上漲${size}。` : `📉 本次報價較前一交易日下跌${size}。`;
-}
+export const DAILY_TITLE = '💰黃金每日行情';
 
 export interface DailyMessageInput {
   price: number;
@@ -92,36 +85,61 @@ export interface DailyMessageInput {
   stale: boolean;
 }
 
-export function formatDailyMessage(i: DailyMessageInput): string {
+/** 每日訊息的欄位（純文字與卡片共用，數字只算一次） */
+export interface DailyFields {
+  valid: boolean;
+  title: string;
+  /** 2026/10/15（四）：報價時間戳換算成的台北日期（Intl 換算，不手動加 8 小時） */
+  date: string | null;
+  instrument: string;
+  price: string;
+  unit: string;
+  /** ▼ −21.83 USD（−0.52%）；沒有前一交易日時為 null */
+  change: string | null;
+  tone: Direction | null;
+  rows: [label: string, value: string][];
+  /** 過期或異常（畫面與卡片要醒目標示） */
+  warning: boolean;
+}
+
+export function dailyFields(i: DailyMessageInput): DailyFields {
   const validTime = !Number.isNaN(i.timestamp.getTime());
-  // 報價日期依實際時間戳換算成台北日期（Intl 換算，不手動加 8 小時）
-  const lines = [`${mockFlag(i.status)}🥇 黃金每日行情`, validTime ? `${formatDateLabel(taipeiDate(i.timestamp))}・台灣時間` : '台灣時間', ''];
-  const source = `資料來源：${describeSource(i.source, i.status)}`;
-
+  const title = `${mockFlag(i.status)}${DAILY_TITLE}`;
+  const date = validTime ? formatDateLabel(taipeiDate(i.timestamp)) : null;
+  const source: [string, string] = ['資料來源', describeSource(i.source, i.status)];
   if (!isValidPrice(i.price) || !validTime) {
-    lines.push(NO_DATA, '', source, '資料狀態：異常（報價無效）', '', ...CHART_LINK);
-    return lines.join('\n');
+    return { valid: false, title, date, instrument: '', price: NO_DATA, unit: '', change: null, tone: null, rows: [source, ['資料狀態', '異常（報價無效）']], warning: true };
   }
-
-  lines.push(instrumentName(i), formatPriceWithUnit(i.price, i.currency, i.unit));
   const hasChange = isValidPrice(i.referencePrice) && isFiniteNumber(i.changeAmount) && isFiniteNumber(i.changePercent);
-  if (hasChange) lines.push('', formatChangeLine(i.changeAmount!, i.changePercent!, i.currency));
+  return {
+    valid: true,
+    title,
+    date,
+    instrument: instrumentName(i),
+    price: formatPrice(i.price),
+    unit: `${i.currency} / ${UNIT_LABEL[i.unit]}`,
+    change: hasChange ? formatChangeLine(i.changeAmount!, i.changePercent!, i.currency) : null,
+    tone: hasChange ? changeDirection(i.changeAmount!) : null,
+    rows: [
+      ['前一交易日', isValidPrice(i.referencePrice) ? `${formatPrice(i.referencePrice)} ${i.currency}` : NO_DATA],
+      ['報價時間', formatTaipeiHour(i.timestamp)],
+      source,
+      ['資料狀態', describeDataStatus(i)],
+    ],
+    warning: i.stale,
+  };
+}
 
-  lines.push(
-    '',
-    `前一交易日：${isValidPrice(i.referencePrice) ? `${formatPrice(i.referencePrice)} ${i.currency}` : NO_DATA}`,
-    `報價時間：${formatTaipei(i.timestamp)}`,
-    source,
-    `資料狀態：${describeDataStatus(i)}`,
-  );
-
-  const summary = i.stale
-    ? '⚠️ 行情來源未更新，這筆報價已過期，漲跌僅反映該筆報價。'
-    : hasChange
-      ? changeSummary(i.changeAmount!, i.changePercent!)
-      : null;
-  if (summary) lines.push('', summary);
-  lines.push('', ...CHART_LINK);
+export function formatDailyMessage(i: DailyMessageInput): string {
+  const f = dailyFields(i);
+  const lines = [f.title, ...(f.date ? [f.date] : []), ''];
+  if (!f.valid) {
+    lines.push(f.price);
+  } else {
+    lines.push(f.instrument, `${f.price} ${f.unit}`);
+    if (f.change) lines.push('', f.change);
+  }
+  lines.push('', ...f.rows.map(([label, value]) => `${label}：${value}`), '', ...CHART_LINK);
   return lines.join('\n');
 }
 
@@ -185,11 +203,9 @@ export function formatTargetMessage(i: TargetMessageInput): string {
   ].join('\n');
 }
 
-/** dailyPreview：最新一筆每日快照組成的每日訊息，讓測試推播也能看到實際格式 */
-export function formatTestMessage(now: Date, dailyPreview: string | null = null): string {
+/** withCard：後面會接著一張每日行情卡片（最新一筆每日快照），讓測試推播也能看到實際樣子 */
+export function formatTestMessage(now: Date, withCard = false): string {
   const lines = ['✅ Gold Daily 測試推播', `發送時間：${formatTaipei(now)}`, '收到這則訊息代表 LINE 推播設定正確。'];
-  if (dailyPreview) {
-    lines.push('', '以下是每日行情的格式預覽（最新一筆每日快照，不是即時查價）：', '', dailyPreview);
-  }
+  if (withCard) lines.push('', '下面是每日行情卡片的預覽（最新一筆每日快照，不是即時查價）。');
   return lines.join('\n');
 }

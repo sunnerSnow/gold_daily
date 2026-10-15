@@ -141,10 +141,12 @@ export async function loadDashboard(deps: JobDeps): Promise<DashboardData> {
     quota: computeQuotaState({
       now,
       latestSuccessfulSync: latestSync,
-      localSentThisMonth: localSent,
+      // 跟發送前的檢查一樣：每次送出都送給所有推播對象
+      localSentThisMonth: localSent * Math.max(1, deps.line.recipientCount),
       monthlyMessageQuota: settings.monthlyMessageQuota,
       quotaSafetyBuffer: settings.quotaSafetyBuffer,
       dailyEnabled: settings.dailyEnabled,
+      recipients: Math.max(1, deps.line.recipientCount),
     }),
     nextIntradayAt,
     targets,

@@ -5,8 +5,8 @@ import { computeQuotaState } from '../quota/guard';
 import type { QuotaSyncRow } from '../store/types';
 import { runDailyJob } from './daily';
 import { runIntradayJob } from './intraday';
-import { CHART_DROPPED_NOTE, retryEvent, sendTestPush } from './notify';
-import { createWorld } from './test-helpers';
+import { CARD_DROPPED_NOTE, retryEvent, sendTestPush } from './notify';
+import { createWorld, type FakePush } from './test-helpers';
 
 // 2026-10-13 是週二。台北 09:00 = 01:00Z。
 const TUE_0900 = '2026-10-13T01:00:00Z';
@@ -69,8 +69,10 @@ describe('每日排程', () => {
     const r = await runDailyJob(w.deps(), { trigger: 'cron' });
     expect(r.status).toBe('success');
     expect(w.line.deliveredCount).toBe(1);
-    const text = w.line.pushes[0].text;
-    expect(text).toContain('【模擬資料】🥇 黃金每日行情');
+    // 推播送卡片；事件上保留同一份內容的純文字
+    expect(w.line.pushes[0].card?.altText).toMatch(/^【模擬資料】💰黃金每日行情 [\d,.]+ USD [▲▼—][\d.]+%$/);
+    const text = (await w.store.getEventByKey('daily:2026-10-13'))!.messageText!;
+    expect(text).toContain('【模擬資料】💰黃金每日行情');
     expect(text).toMatch(/前一交易日：\d/);
     expect(text).toMatch(/^[▲▼—] [+−]?[\d,.]+ USD（[+−]?[\d.]+%）$/m);
     expect(text).toContain('https://www.truney.com/gold-chart');
@@ -110,11 +112,12 @@ describe('每日排程', () => {
     expect(run).toMatchObject({ status: 'failed', errorMessage: 'LINE API 500' });
   });
 
-  it('不可重試的錯誤（例如 400）不會重試', async () => {
+  it('不可重試的錯誤（例如 400）不會重試；卡片被拒時只改送一次純文字', async () => {
     const w = createWorld(TUE_0900);
-    w.line.script = [{ ok: false, status: 400, retryable: false, error: 'LINE API 400' }];
+    const bad = { ok: false as const, status: 400, retryable: false, error: 'LINE API 400' };
+    w.line.script = [bad, bad];
     await runDailyJob(w.deps(), { trigger: 'cron' });
-    expect(w.line.pushes).toHaveLength(1);
+    expect(w.line.pushes.map((p) => (p.card ? 'card' : 'text'))).toEqual(['card', 'text']);
     expect(await w.store.getEventByKey('daily:2026-10-13')).toMatchObject({ status: 'failed', attemptCount: 1 });
   });
 
@@ -351,76 +354,136 @@ describe('LINE 額度保護', () => {
   });
 });
 
-describe('每日推播附走勢圖', () => {
+describe('每日推播卡片', () => {
   const APP = 'https://gold.example';
-  const CHART = `${APP}/api/chart/2026-10-13.png`;
+  const CHART = `${APP}/api/chart/2026-10-13-compact.png`;
+  const imageOf = (p: FakePush | undefined) => {
+    const body = (p?.card?.contents as { body?: { contents?: { type: string; url?: string }[] } } | undefined)?.body?.contents ?? [];
+    return body.find((n) => n.type === 'image')?.url ?? null;
+  };
 
-  it('有公開網址且至少有 2 天每日快照：文字與走勢圖同一次送出（只算 1 則）', async () => {
+  it('送出卡片，走勢圖放在卡片裡（文字與圖同一則）', async () => {
     const w = createWorld(TUE_0900);
     const r = await runDailyJob({ ...w.deps(), appUrl: APP }, { trigger: 'cron' });
     expect(r.status).toBe('success');
     expect(w.line.pushes).toHaveLength(1);
-    expect(w.line.pushes[0].imageUrl).toBe(CHART);
+    expect(w.line.pushes[0].messages).toHaveLength(1);
+    expect(imageOf(w.line.pushes[0])).toBe(CHART);
     expect(w.line.deliveredCount).toBe(1);
-    expect(r.detail).toContain('（附走勢圖）');
+    expect(r.detail).toContain('（卡片＋走勢圖）');
   });
 
-  it('沒有公開網址或只有本機 http 時只送文字', async () => {
+  it('卡片的數字跟事件上保存的純文字一致', async () => {
+    const w = createWorld(TUE_0900);
+    await runDailyJob({ ...w.deps(), appUrl: APP }, { trigger: 'cron' });
+    const text = (await w.store.getEventByKey('daily:2026-10-13'))!.messageText!;
+    const card = JSON.stringify(w.line.pushes[0].card);
+    const change = /^[▲▼—] .+$/m.exec(text)![0];
+    const prev = /^前一交易日：(.+)$/m.exec(text)![1];
+    expect(card).toContain(change);
+    expect(card).toContain(prev);
+  });
+
+  it('沒有公開網址或只有本機 http 時，卡片照送但沒有圖', async () => {
     for (const appUrl of [undefined, 'http://localhost:3000']) {
       const w = createWorld(TUE_0900);
       const r = await runDailyJob({ ...w.deps(), appUrl }, { trigger: 'cron' });
-      expect(w.line.pushes[0].imageUrl).toBeNull();
-      expect(r.detail).not.toContain('走勢圖');
+      expect(w.line.pushes[0].card).not.toBeNull();
+      expect(imageOf(w.line.pushes[0])).toBeNull();
+      expect(r.detail).toContain('（卡片）');
     }
   });
 
-  it('LINE 拒絕圖片（400）時改送純文字，推播照常完成', async () => {
+  it('LINE 拒絕卡片（400）時改送純文字，推播照常完成', async () => {
     const w = createWorld(TUE_0900);
-    w.line.script = [{ ok: false, status: 400, retryable: false, error: 'LINE API 400：invalid image url' }];
+    w.line.rejectCards = true;
     const r = await runDailyJob({ ...w.deps(), appUrl: APP }, { trigger: 'cron' });
-    expect(w.line.pushes.map((p) => p.imageUrl)).toEqual([CHART, null]);
+    expect(w.line.pushes.map((p) => (p.card ? 'card' : 'text'))).toEqual(['card', 'text']);
+    expect(w.line.pushes[1].text).toContain('💰黃金每日行情');
     expect(w.line.deliveredCount).toBe(1);
-    expect(await w.store.getEventByKey('daily:2026-10-13')).toMatchObject({ status: 'sent', lastError: CHART_DROPPED_NOTE });
-    expect(r.detail).toContain('走勢圖被 LINE 拒絕');
+    expect(await w.store.getEventByKey('daily:2026-10-13')).toMatchObject({ status: 'sent', lastError: CARD_DROPPED_NOTE });
+    expect(r.detail).toContain('卡片被 LINE 拒絕');
   });
 
-  it('報價過期時不附圖（當天沒有每日快照）', async () => {
+  it('報價過期時改送純文字（當天沒有每日快照，做不出卡片）', async () => {
     const w = createWorld(TUE_0900);
     await runDailyJob({ ...w.deps('stale'), appUrl: APP }, { trigger: 'cron' });
-    expect(w.line.pushes[0].imageUrl).toBeNull();
+    expect(w.line.pushes[0].card).toBeNull();
+    expect(w.line.pushes[0].text).toContain('資料狀態：過期');
   });
 
-  it('補送與手動重試時一樣附上當天的走勢圖', async () => {
+  it('手動重試時一樣送當天的卡片，沿用同一個 retry key', async () => {
     const w = createWorld(TUE_0900);
-    w.line.script = [{ ok: false, status: 500, retryable: true, error: 'LINE API 500' }, { ok: false, status: 500, retryable: true, error: 'LINE API 500' }, { ok: false, status: 500, retryable: true, error: 'LINE API 500' }];
+    const fail = { ok: false as const, status: 500, retryable: true, error: 'LINE API 500' };
+    w.line.script = [fail, fail, fail];
     await runDailyJob({ ...w.deps(), appUrl: APP }, { trigger: 'cron' });
     const failed = await w.store.getEventByKey('daily:2026-10-13');
     expect(failed?.status).toBe('failed');
     const result = await retryEvent({ ...w.deps(), appUrl: APP }, failed!.id);
     expect(result.ok && result.event.status).toBe('sent');
-    expect(w.line.pushes.at(-1)?.imageUrl).toBe(CHART);
+    expect(imageOf(w.line.pushes.at(-1))).toBe(CHART);
+    expect(JSON.stringify(w.line.pushes.at(-1)!.card)).toBe(JSON.stringify(w.line.pushes[0].card));
     expect(new Set(w.line.pushes.map((p) => p.retryKey)).size).toBe(1);
   });
 
-  it('測試推播附上每日行情的格式預覽與走勢圖', async () => {
+  it('測試推播：測試文字＋每日卡片放在同一次送出', async () => {
     const w = createWorld(TUE_0900);
     await runDailyJob(w.deps(), { trigger: 'cron' });
-    const { event, withChart } = await sendTestPush({ ...w.deps(), appUrl: APP });
+    const { event, withCard } = await sendTestPush({ ...w.deps(), appUrl: APP });
     expect(event.status).toBe('sent');
-    expect(withChart).toBe(true);
+    expect(withCard).toBe(true);
     const last = w.line.pushes.at(-1)!;
+    expect(last.messages.map((m) => m.type)).toEqual(['text', 'flex']);
     expect(last.text).toContain('✅ Gold Daily 測試推播');
-    expect(last.text).toContain('格式預覽');
-    expect(last.text).toContain('🥇 黃金每日行情');
-    expect(last.imageUrl).toBe(CHART);
+    expect(last.text).toContain('卡片的預覽');
+    expect(imageOf(last)).toBe(CHART);
   });
 
   it('還沒有每日快照時，測試推播只有測試文字', async () => {
     const w = createWorld(TUE_0900);
-    const { event, withChart } = await sendTestPush({ ...w.deps(), appUrl: APP });
+    const { event, withCard } = await sendTestPush({ ...w.deps(), appUrl: APP });
     expect(event.status).toBe('sent');
-    expect(withChart).toBe(false);
-    expect(w.line.pushes[0].text).not.toContain('格式預覽');
-    expect(w.line.pushes[0].imageUrl).toBeNull();
+    expect(withCard).toBe(false);
+    expect(w.line.pushes[0].card).toBeNull();
+    expect(w.line.pushes[0].text).not.toContain('卡片');
+  });
+});
+
+describe('多位推播對象的額度', () => {
+  it('每日推播保留的額度依人數計算', () => {
+    const base = {
+      now: new Date('2026-10-20T01:00:00Z'), // 計費月剩 11 天
+      latestSuccessfulSync: { id: 1, syncedAt: new Date('2026-10-20T00:30:00Z'), success: true, quotaType: 'limited', quotaValue: 200, totalUsage: 150, errorMessage: null } as QuotaSyncRow,
+      localSentThisMonth: 0,
+      monthlyMessageQuota: 200,
+      quotaSafetyBuffer: 5,
+      dailyEnabled: true,
+    };
+    const one = computeQuotaState(base);
+    const two = computeQuotaState({ ...base, recipients: 2 });
+    expect(two.reserveForDaily - base.quotaSafetyBuffer).toBe((one.reserveForDaily - base.quotaSafetyBuffer) * 2);
+    // 剩 50 則：1 人時保留 16 則還能送提醒；2 人時要保留 27 則，提醒一次用 2 則，仍可送
+    expect(one.canSend.alert).toBe(true);
+    expect(two.canSend.alert).toBe(true);
+    const tight = computeQuotaState({ ...base, recipients: 2, latestSuccessfulSync: { ...base.latestSuccessfulSync!, totalUsage: 172 } });
+    expect(tight.canSend).toMatchObject({ daily: true, alert: false, test: false });
+    expect(tight.pausedReason).toContain('推播對象 2 人');
+  });
+
+  it('剩餘則數不夠送給所有人時，整則不送（不會只送一部分人）', async () => {
+    const w = createWorld(TUE_0900);
+    w.line.recipientCount = 2;
+    w.line.baseUsage = 199;
+    await runDailyJob(w.deps(), { trigger: 'cron' });
+    expect(w.line.pushes).toHaveLength(0);
+    expect(await w.store.getEventByKey('daily:2026-10-13')).toMatchObject({ status: 'skipped', skipReason: 'quota_insufficient' });
+  });
+
+  it('兩人時官方用量一次增加 2 則', async () => {
+    const w = createWorld(TUE_0900);
+    w.line.recipientCount = 2;
+    await runDailyJob(w.deps(), { trigger: 'cron' });
+    expect(w.line.deliveredCount).toBe(1);
+    expect((await w.line.getConsumption()).totalUsage).toBe(2);
   });
 });

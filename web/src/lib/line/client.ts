@@ -10,19 +10,23 @@ export interface LineQuota {
   value: number | null;
 }
 
-/**
- * 一次推播的內容：文字，加上可選的圖片（必須是公開的 https 網址，LINE 會自己去抓）。
- * 同一次請求最多 5 個訊息框，LINE 只算 1 則。
- */
-export interface PushContent {
-  text: string;
-  imageUrl?: string | null;
+import type { FlexMessage } from './flex';
+
+/** 送出的訊息框：文字或卡片（Flex）。同一次請求最多 5 個訊息框，LINE 對每位收件人只算 1 則。 */
+export type LineMessage = { type: 'text'; text: string } | FlexMessage;
+
+export function textMessage(text: string): LineMessage {
+  return { type: 'text', text: text.slice(0, LINE_TEXT_LIMIT) };
 }
 
 export interface LineClient {
   readonly configured: boolean;
-  /** retryKey 重試時必須沿用同一個值，LINE 端才會去重 */
-  push(content: PushContent, retryKey: string): Promise<PushResult>;
+  /** 推播對象人數（LINE 依人數計算額度）；未設定時為 0 */
+  readonly recipientCount: number;
+  /** 送給所有推播對象。retryKey 重試時必須沿用同一個值，LINE 端才會去重 */
+  push(messages: LineMessage[], retryKey: string): Promise<PushResult>;
+  /** 回覆使用者剛傳來的訊息（webhook 用；回覆不算額度） */
+  reply(replyToken: string, messages: LineMessage[]): Promise<PushResult>;
   getQuota(): Promise<LineQuota>;
   getConsumption(): Promise<{ totalUsage: number }>;
 }
@@ -31,14 +35,6 @@ const API = 'https://api.line.me/v2/bot';
 const TIMEOUT_MS = 10_000;
 /** LINE 單則文字訊息上限 5000 字 */
 export const LINE_TEXT_LIMIT = 5000;
-
-/** 組成 LINE 的 messages 陣列：文字在前、圖片在後 */
-export function toLineMessages({ text, imageUrl }: PushContent) {
-  const messages: Record<string, string>[] = [{ type: 'text', text: text.slice(0, LINE_TEXT_LIMIT) }];
-  // 預覽圖與原圖用同一張（檔案遠小於預覽圖 1 MB 的上限）
-  if (imageUrl) messages.push({ type: 'image', originalContentUrl: imageUrl, previewImageUrl: imageUrl });
-  return messages;
-}
 
 export class LineApiError extends Error {
   constructor(message: string, readonly status: number | null) {
@@ -61,21 +57,36 @@ export class HttpLineClient implements LineClient {
 
   constructor(
     private readonly token: string,
-    private readonly userId: string,
+    /** 推播名單（LINE User ID）；一人用 push，多人用 multicast 一次送出 */
+    private readonly userIds: string[],
     private readonly fetchImpl: typeof fetch = fetch,
   ) {}
+
+  get recipientCount() {
+    return this.userIds.length;
+  }
 
   private headers(extra: Record<string, string> = {}) {
     return { Authorization: `Bearer ${this.token}`, ...extra };
   }
 
-  async push(content: PushContent, retryKey: string): Promise<PushResult> {
+  push(messages: LineMessage[], retryKey: string): Promise<PushResult> {
+    const multi = this.userIds.length > 1;
+    // https://developers.line.biz/en/reference/messaging-api/#send-multicast-message
+    return this.send(multi ? 'multicast' : 'push', { to: multi ? this.userIds : this.userIds[0], messages }, retryKey);
+  }
+
+  reply(replyToken: string, messages: LineMessage[]): Promise<PushResult> {
+    return this.send('reply', { replyToken, messages }, null);
+  }
+
+  private async send(endpoint: 'push' | 'multicast' | 'reply', body: unknown, retryKey: string | null): Promise<PushResult> {
     let res: Response;
     try {
-      res = await this.fetchImpl(`${API}/message/push`, {
+      res = await this.fetchImpl(`${API}/message/${endpoint}`, {
         method: 'POST',
-        headers: this.headers({ 'Content-Type': 'application/json', 'X-Line-Retry-Key': retryKey }),
-        body: JSON.stringify({ to: this.userId, messages: toLineMessages(content) }),
+        headers: this.headers({ 'Content-Type': 'application/json', ...(retryKey ? { 'X-Line-Retry-Key': retryKey } : {}) }),
+        body: JSON.stringify(body),
         signal: AbortSignal.timeout(TIMEOUT_MS),
         cache: 'no-store',
       });
@@ -123,7 +134,11 @@ export class HttpLineClient implements LineClient {
 /** 沒設定 LINE 時使用：不會呼叫任何外部服務，也不會假裝送出 */
 export class UnconfiguredLineClient implements LineClient {
   readonly configured = false;
+  readonly recipientCount = 0;
   async push(): Promise<PushResult> {
+    return { ok: false, status: null, retryable: false, error: 'LINE 尚未連線' };
+  }
+  async reply(): Promise<PushResult> {
     return { ok: false, status: null, retryable: false, error: 'LINE 尚未連線' };
   }
   async getQuota(): Promise<LineQuota> {

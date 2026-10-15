@@ -7,7 +7,7 @@ import { PageHead } from '@/components/site-chrome';
 import { EventStatusChip } from '@/components/status-chips';
 import { MockScenarioForm } from '@/components/mock-scenario-form';
 import { chartPath } from '@/lib/chart/daily-chart';
-import { checkEnv, getEnv } from '@/lib/env';
+import { checkEnv, getEnv, parseLineUserIds } from '@/lib/env';
 import { formatPrice } from '@/lib/gold/math';
 import { PROVIDER_SAFETY_MARGIN } from '@/lib/gold/budget';
 import { MOCK_SCENARIOS } from '@/lib/gold/mock-provider';
@@ -50,7 +50,8 @@ export default async function SettingsPage() {
   const dailyPreview = preview?.text ?? null;
   const alertEvent = (await deps.store.listEvents({ types: ['alert_up', 'alert_down'], limit: 20 })).find((e) => e.messageText);
   const lastTest = (await deps.store.listEvents({ types: ['test'], limit: 1 }))[0] ?? null;
-  const userIdTail = env.LINE_USER_ID && envStatus.line ? env.LINE_USER_ID.slice(-4) : null;
+  // 只顯示每個 User ID 的末 4 碼
+  const recipientTails = envStatus.line ? parseLineUserIds(env.LINE_USER_ID).map((id) => id.slice(-4)) : [];
 
   const quota = data.provider.monthlyCallQuota;
   const targetEvents = new Map(
@@ -134,7 +135,18 @@ export default async function SettingsPage() {
                 <dt>Access Token</dt>
                 <dd>{env.LINE_CHANNEL_ACCESS_TOKEN ? '已設定（只存在伺服器端）' : '未設定'}</dd>
                 <dt>推播對象</dt>
-                <dd>{userIdTail ? <>User ID 已設定・末 4 碼 <span className="num">{userIdTail}</span></> : env.LINE_USER_ID ? 'User ID 格式不正確' : '未設定'}</dd>
+                <dd>
+                  {recipientTails.length ? (
+                    <>
+                      {recipientTails.length} 人・末 4 碼 <span className="num">{recipientTails.join('、')}</span>
+                      {recipientTails.length > 1 ? <span className="cell-note">每次推播每人算 1 則額度</span> : null}
+                    </>
+                  ) : env.LINE_USER_ID ? (
+                    'User ID 格式不正確'
+                  ) : (
+                    '未設定'
+                  )}
+                </dd>
               </dl>
               {!envStatus.line ? (
                 <p className="small">LINE 尚未連線，每日推播與提醒都只會記錄為「未發送」，不會假裝送出。設定步驟見 README。</p>
@@ -173,9 +185,13 @@ export default async function SettingsPage() {
               {dailyPreview ? <div className="msg">{dailyPreview}</div> : <p className="small soft">尚無每日快照，暫時無法預覽。</p>}
               {preview?.chartAvailable ? (
                 // eslint-disable-next-line @next/next/no-img-element -- 動態產生的 PNG，跟 LINE 收到的是同一張
-                <img className="msg-chart" src={chartPath(preview.date)} alt={`截至 ${preview.date} 的近期金價走勢圖`} width={1040} height={650} loading="lazy" />
+                <img className="msg-chart" src={chartPath(preview.date, 'compact')} alt={`截至 ${preview.date} 的近期金價走勢圖`} width={1040} height={585} loading="lazy" />
               ) : null}
-              {latestDaily ? <p className="caption">取自 {latestDaily.dailyDate} 的每日快照{preview?.chartAvailable ? '；走勢圖會跟文字一起推播（同一則，不另外計算額度）' : ''}。</p> : null}
+              {latestDaily ? (
+                <p className="caption">
+                  取自 {latestDaily.dailyDate} 的每日快照。LINE 上是卡片樣式：漲跌上色（漲紅、跌綠），走勢圖在文字下方；按「發送測試推播」可以看到實際樣子。
+                </p>
+              ) : null}
             </section>
 
             <section className="card card--tight" aria-labelledby="pv-alert-h">

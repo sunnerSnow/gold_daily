@@ -133,6 +133,20 @@ export function formatTaipei(date: Date | string | null | undefined, withSeconds
   return `${p.year}/${pad(p.month)}/${pad(p.day)} ${time}`;
 }
 
+/**
+ * 每日推播用的短格式：2026/10/15 09AM；不是整點時保留分鐘，例如 2026/10/15 01:19PM（不捨去實際時間）
+ */
+export function formatTaipeiHour(date: Date | string | null | undefined): string {
+  if (!date) return '—';
+  const d = typeof date === 'string' ? new Date(date) : date;
+  if (Number.isNaN(d.getTime())) return '—';
+  const p = taipeiParts(d);
+  const hour12 = p.hour % 12 === 0 ? 12 : p.hour % 12;
+  const suffix = p.hour < 12 ? 'AM' : 'PM';
+  const time = p.minute === 0 ? pad(hour12) : `${pad(hour12)}:${pad(p.minute)}`;
+  return `${p.year}/${pad(p.month)}/${pad(p.day)} ${time}${suffix}`;
+}
+
 /** 10:30:00 */
 export function formatTaipeiTime(date: Date | string | null | undefined): string {
   if (!date) return '—';

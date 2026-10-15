@@ -10,14 +10,16 @@ import { formatDateLabel } from '../time';
 export const CHART_DAYS = 30;
 export const CHART_WIDTH = 1040;
 export const CHART_HEIGHT = 650;
+/** 精簡版（每日卡片裡用，16:9） */
+export const CHART_COMPACT_HEIGHT = 585;
 
 /** 圖片字型（src/assets/fonts 的 Noto Sans TC 子集）只收錄這些中文字與符號，加上所有 ASCII。 */
 export const CHART_GLYPHS = '國際現貨黃金近個交易日走勢較前一期間最高低資料來源每快照台灣時間模擬非真實行情衡盎司公克日一二三四五六（）・：—▲▼−±';
 
-export const CHART_FILE_PATTERN = /^(\d{4}-\d{2}-\d{2})\.png$/;
+export const CHART_FILE_PATTERN = /^(\d{4}-\d{2}-\d{2})(-compact)?\.png$/;
 
-export function chartPath(date: string): string {
-  return `/api/chart/${date}.png`;
+export function chartPath(date: string, variant: 'full' | 'compact' = 'full'): string {
+  return `/api/chart/${date}${variant === 'compact' ? '-compact' : ''}.png`;
 }
 
 /**
@@ -35,9 +37,9 @@ export function resolveAppUrl(env: { NEXT_PUBLIC_APP_URL?: string; VERCEL_PROJEC
 }
 
 /** LINE 只接受 https 的圖片網址；本機的 http://localhost 不附圖 */
-export function chartImageUrl(appUrl: string | null | undefined, date: string): string | null {
+export function chartImageUrl(appUrl: string | null | undefined, date: string, variant: 'full' | 'compact' = 'full'): string | null {
   if (!appUrl || !appUrl.startsWith('https://')) return null;
-  return `${appUrl}${chartPath(date)}`;
+  return `${appUrl}${chartPath(date, variant)}`;
 }
 
 export interface ChartPoint {
@@ -126,6 +128,8 @@ export interface ChartInfo {
 
 export interface ChartLabels {
   title: string;
+  /** 近 30 個交易日 */
+  span: string;
   price: string;
   unit: string;
   /** 最後一天相對前一交易日的漲跌；跟每日訊息用同一套箭頭 */
@@ -147,6 +151,7 @@ export function buildChartLabels(model: ChartModel, info: ChartInfo): ChartLabel
   const tone = changeDirection(amount);
   return {
     title: `${instrumentName(info)}・近 ${model.points.length} 個交易日`,
+    span: `近 ${model.points.length} 個交易日`,
     price: formatPrice(model.last.price),
     unit: `${info.currency} / ${UNIT_LABEL[info.unit]}`,
     change: tone === 'flat' ? `${DIRECTION_MARK.flat} 0.00（0.00%）` : `${DIRECTION_MARK[tone]} ${formatSigned(amount)}（${formatPercent(percent)}）`,
