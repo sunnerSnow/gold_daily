@@ -46,6 +46,7 @@ export async function evaluateTargets(
         direction: t.direction,
         price: quote.price,
         targetPrice: t.targetPrice,
+        symbol: quote.symbol,
         currency: quote.currency,
         unit: quote.unit,
         timestamp: quote.timestamp,

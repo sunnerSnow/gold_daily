@@ -20,6 +20,8 @@ const supabaseUrl = optionalText.transform((v) => {
 
 const schema = z.object({
   NEXT_PUBLIC_APP_URL: optionalText,
+  /** Vercel 自動提供的正式網域（不含 https://），沒設 NEXT_PUBLIC_APP_URL 時用來組走勢圖網址 */
+  VERCEL_PROJECT_PRODUCTION_URL: optionalText,
   SUPABASE_URL: supabaseUrl,
   SUPABASE_ANON_KEY: optionalText,
   SUPABASE_SERVICE_ROLE_KEY: optionalText,
@@ -108,6 +110,15 @@ export function checkEnv(env: AppEnv): EnvStatus {
     issues.push({ key: 'GOLD_PRICE_API_KEY', message: '使用 GoldAPI 需要設定 GOLD_PRICE_API_KEY。' });
   } else if (env.GOLD_PRICE_PROVIDER.toLowerCase() === 'mock' && env.NODE_ENV === 'production') {
     issues.push({ key: 'GOLD_PRICE_PROVIDER', message: '正式環境目前使用 Mock Provider（模擬資料）。' });
+  }
+
+  // 走勢圖要用公開的 https 網址；判斷不出來時每日推播照常送文字，只是不附圖
+  if (env.NEXT_PUBLIC_APP_URL && !env.NEXT_PUBLIC_APP_URL.startsWith('https://')) {
+    if (env.NODE_ENV === 'production') {
+      issues.push({ key: 'NEXT_PUBLIC_APP_URL', message: 'NEXT_PUBLIC_APP_URL 不是 https，LINE 不接受，每日推播不會附走勢圖。' });
+    }
+  } else if (!env.NEXT_PUBLIC_APP_URL && !env.VERCEL_PROJECT_PRODUCTION_URL && env.NODE_ENV === 'production') {
+    issues.push({ key: 'NEXT_PUBLIC_APP_URL', message: '無法判斷網站網址，每日推播不會附走勢圖；請設定 NEXT_PUBLIC_APP_URL。' });
   }
 
   return {

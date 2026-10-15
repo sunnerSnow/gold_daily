@@ -204,10 +204,15 @@ export async function setMockScenarioAction(_prev: ActionState, formData: FormDa
 export async function testPushAction(_prev: ActionState): Promise<ActionState> {
   if (!(await isAdmin())) return DENIED;
   const deps = await buildDeps();
-  const event = await sendTestPush(deps);
+  const { event, withChart } = await sendTestPush(deps);
   const ok = event.status === 'sent';
   revalidatePath('/', 'layout');
-  return { ok, message: ok ? '測試推播已送出，請查看 LINE。' : `測試推播${describeEvent(event)}${event.lastError ? `：${event.lastError}` : ''}` };
+  return {
+    ok,
+    message: ok
+      ? `測試推播已送出${withChart ? '（含每日行情預覽與走勢圖）' : ''}，請查看 LINE。`
+      : `測試推播${describeEvent(event)}${event.lastError ? `：${event.lastError}` : ''}`,
+  };
 }
 
 export async function retryEventAction(_prev: ActionState, formData: FormData): Promise<ActionState> {

@@ -100,6 +100,7 @@ export async function evaluateAndNotify(
   const messageText = formatAlertMessage({
     direction: decision.direction,
     price: quote.price,
+    symbol: quote.symbol,
     currency: quote.currency,
     unit: quote.unit,
     baselinePrice: baseline.price,

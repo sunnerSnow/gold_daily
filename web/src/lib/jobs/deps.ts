@@ -12,6 +12,8 @@ export interface JobDeps {
   /** 重試間隔；測試時換成不等待 */
   sleep: (ms: number) => Promise<void>;
   newId: () => string;
+  /** 網站對外的 https 網址（每日推播附走勢圖用）；沒有時只送文字 */
+  appUrl?: string | null;
 }
 
 export type JobOutcomeStatus = 'not_due' | 'disabled' | 'locked' | 'success' | 'skipped' | 'failed';

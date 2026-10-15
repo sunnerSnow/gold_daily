@@ -3,6 +3,7 @@ import { randomUUID } from 'node:crypto';
 import { cookies } from 'next/headers';
 import { cache } from 'react';
 import { authMode, SESSION_COOKIE, verifySessionToken } from './auth/session';
+import { resolveAppUrl } from './chart/daily-chart';
 import { checkEnv, getEnv } from './env';
 import { createProvider } from './gold/registry';
 import type { JobDeps } from './jobs/deps';
@@ -31,6 +32,7 @@ export async function buildDeps(): Promise<JobDeps> {
     now: () => new Date(),
     sleep: (ms) => new Promise((r) => setTimeout(r, ms)),
     newId: () => randomUUID(),
+    appUrl: resolveAppUrl(env),
   };
 }
 

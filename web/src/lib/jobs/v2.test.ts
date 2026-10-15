@@ -235,7 +235,7 @@ describe('到價提醒', () => {
     expect(t.status).toBe('triggered');
     expect(t.eventId).not.toBeNull();
     const target = w.line.pushes.find((p) => p.text.includes('黃金到價提醒'));
-    expect(target?.text).toContain('目標價格：1,000.00（漲到以上）');
+    expect(target?.text).toContain('目標價格：1,000.00 USD（漲到以上）');
     expect(target?.text).toContain('備註：測試');
     w.clock.advanceMinutes(15);
     await runIntradayJob(w.deps(), { trigger: 'cron' });

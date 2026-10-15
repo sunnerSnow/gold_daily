@@ -19,7 +19,8 @@
 | 前端 | Next.js 16 App Router + TypeScript + Tailwind 4；頁面：儀表板 `/`、歷史資料 `/history`、推播設定 `/settings`、系統狀態 `/status`、登入 `/login` |
 | 行情來源 | `src/lib/gold/`：`GoldPriceProvider` 介面（`getLatestPrice` / `getHistoricalPrice` / `getProviderStatus`），實作有 `GoldApiProvider`（正式）與 `MockGoldPriceProvider`；未設定或不支援的來源一律顯示「尚未設定正式行情來源」，不會偷用 Mock。`budget.ts` 是查價次數保護 |
 | 資料 | `src/lib/store/`：`Store` 介面，`SupabaseStore`（正式）與 `MemoryStore`（測試、沒有 Supabase 的本機開發） |
-| LINE | `src/lib/line/`：Push API、額度查詢；重試沿用 `X-Line-Retry-Key` |
+| LINE | `src/lib/line/`：Push API、額度查詢；重試沿用 `X-Line-Retry-Key`。訊息格式在 `messages.ts`（每日、異動、到價提醒共用同一組格式化函式） |
+| 走勢圖 | `/api/chart/<日期>.png`：用資料庫的每日快照畫近 30 個交易日，跟每日推播的文字放在同一次請求送出（LINE 只算 1 則），不會多查價。LINE 的伺服器要能直接抓，所以不需登入；只畫已存在的日期，其他網址一律 404，同一天的圖交給 CDN 快取。網址要是 https 才會附圖（本機不附）。字型是 `src/assets/fonts/` 的 Noto Sans TC 子集（SIL OFL） |
 | 排程工作 | `src/lib/jobs/`：每日行情 `daily.ts`、盤中檢查 `intraday.ts`、額度同步 `maintenance.ts`；只依賴介面，所以可以用假的 LINE 與記憶體資料完整測試 |
 | 排程 API | `/api/cron/daily`、`/api/cron/intraday`、`/api/cron/quota-sync`，GET / POST 都可，需 `Authorization: Bearer <CRON_SECRET>` |
 | 管理介面保護 | `src/proxy.ts`＋每個 Server Action 都再檢查一次；`ADMIN_PASSWORD`＋`SESSION_SECRET` 簽的 httpOnly cookie |
@@ -171,7 +172,7 @@ pg_net 預設逾時只有 2 秒，`cron.sql` 已改成 30 秒。每 15 分鐘的
 ## 部署（Vercel）
 
 1. 把 repo 匯入 Vercel，Root Directory 設為 `web`。`vercel.json` 已把函式地區設在東京（`hnd1`），跟 Supabase 同一區，避免每次查資料庫都跨太平洋。
-2. 在 Vercel 專案設定填環境變數（見 `.env.example`）：`SUPABASE_URL`、`SUPABASE_SERVICE_ROLE_KEY`、`LINE_CHANNEL_ACCESS_TOKEN`、`LINE_USER_ID`、`GOLD_PRICE_PROVIDER=goldapi`、`GOLD_PRICE_API_KEY`、`CRON_SECRET`、`ADMIN_PASSWORD`、`SESSION_SECRET`（`NEXT_PUBLIC_APP_URL` 目前用不到，可以不填）。秘密類的值請存成 Secret／Sensitive。
+2. 在 Vercel 專案設定填環境變數（見 `.env.example`）：`SUPABASE_URL`、`SUPABASE_SERVICE_ROLE_KEY`、`LINE_CHANNEL_ACCESS_TOKEN`、`LINE_USER_ID`、`GOLD_PRICE_PROVIDER=goldapi`、`GOLD_PRICE_API_KEY`、`CRON_SECRET`、`ADMIN_PASSWORD`、`SESSION_SECRET`（`NEXT_PUBLIC_APP_URL` 可以不填：走勢圖網址會自動用 Vercel 的正式網域；改用自訂網域時再填）。秘密類的值請存成 Secret／Sensitive。
 3. 部署後照〈排程〉設定 pg_cron。
 4. 打開系統狀態頁確認：行情來源、排程最後呼叫時間、LINE 已設定、額度同步成功、設定檢查沒有問題。
 

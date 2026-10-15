@@ -6,15 +6,15 @@ import { SettingsForm, type BaselineInfo } from '@/components/settings-form';
 import { PageHead } from '@/components/site-chrome';
 import { EventStatusChip } from '@/components/status-chips';
 import { MockScenarioForm } from '@/components/mock-scenario-form';
+import { chartPath } from '@/lib/chart/daily-chart';
 import { checkEnv, getEnv } from '@/lib/env';
-import { computeChange, formatPrice } from '@/lib/gold/math';
+import { formatPrice } from '@/lib/gold/math';
 import { PROVIDER_SAFETY_MARGIN } from '@/lib/gold/budget';
 import { MOCK_SCENARIOS } from '@/lib/gold/mock-provider';
+import { latestDailyPreview } from '@/lib/jobs/chart-data';
 import { describeEvent } from '@/lib/jobs/daily';
 import { hasIntradayChecks } from '@/lib/schedule';
 import { UNIT_LABEL } from '@/lib/gold/types';
-import { isStale } from '@/lib/gold/validate';
-import { formatDailyMessage } from '@/lib/line/messages';
 import { getPageDeps } from '@/lib/server';
 import { formatTaipei, taipeiDate } from '@/lib/time';
 import { loadDashboard } from '@/lib/view/dashboard';
@@ -44,26 +44,10 @@ export default async function SettingsPage() {
       }
     : null;
 
-  // 每日推播預覽：用最新一筆每日快照與它的前一交易日
-  const instrument = data.instrument;
-  const dailyRows = instrument ? (await deps.store.listDailySnapshots({ instrument, limit: 2 })).rows : [];
-  const latestDaily = dailyRows[0] ?? null;
-  const prevDaily = latestDaily && instrument ? await deps.store.getPreviousDailySnapshot(instrument, latestDaily.dailyDate!) : null;
-  const dailyChange = latestDaily ? computeChange(latestDaily.price, prevDaily?.price) : null;
-  const dailyPreview = latestDaily
-    ? formatDailyMessage({
-        price: latestDaily.price,
-        currency: latestDaily.currency,
-        unit: latestDaily.unit,
-        referencePrice: prevDaily?.price ?? null,
-        changeAmount: dailyChange?.amount ?? null,
-        changePercent: dailyChange?.percent ?? null,
-        timestamp: latestDaily.quoteTimestamp,
-        source: latestDaily.source,
-        status: latestDaily.status,
-        stale: isStale(latestDaily.quoteTimestamp, data.now, data.provider.staleAfterMinutes) && latestDaily.dailyDate === today,
-      })
-    : null;
+  // 每日推播預覽：用最新一筆每日快照與它的前一交易日（跟測試推播同一份）
+  const preview = await latestDailyPreview(deps);
+  const latestDaily = preview?.snapshot ?? null;
+  const dailyPreview = preview?.text ?? null;
   const alertEvent = (await deps.store.listEvents({ types: ['alert_up', 'alert_down'], limit: 20 })).find((e) => e.messageText);
   const lastTest = (await deps.store.listEvents({ types: ['test'], limit: 1 }))[0] ?? null;
   const userIdTail = env.LINE_USER_ID && envStatus.line ? env.LINE_USER_ID.slice(-4) : null;
@@ -187,7 +171,11 @@ export default async function SettingsPage() {
                 {latestDaily?.status === 'mock' ? <span className="chip chip--mock">模擬資料</span> : null}
               </div>
               {dailyPreview ? <div className="msg">{dailyPreview}</div> : <p className="small soft">尚無每日快照，暫時無法預覽。</p>}
-              {latestDaily ? <p className="caption">取自 {latestDaily.dailyDate} 的每日快照。</p> : null}
+              {preview?.chartAvailable ? (
+                // eslint-disable-next-line @next/next/no-img-element -- 動態產生的 PNG，跟 LINE 收到的是同一張
+                <img className="msg-chart" src={chartPath(preview.date)} alt={`截至 ${preview.date} 的近期金價走勢圖`} width={1040} height={650} loading="lazy" />
+              ) : null}
+              {latestDaily ? <p className="caption">取自 {latestDaily.dailyDate} 的每日快照{preview?.chartAvailable ? '；走勢圖會跟文字一起推播（同一則，不另外計算額度）' : ''}。</p> : null}
             </section>
 
             <section className="card card--tight" aria-labelledby="pv-alert-h">

@@ -71,5 +71,8 @@
 
 .text-pre { white-space: pre-line; }
 
+/* 設定頁的走勢圖預覽（跟 LINE 收到的是同一張） */
+.msg-chart { display: block; width: 100%; height: auto; margin-top: 12px; border-radius: 12px; border: 1px solid var(--line); }
+
 /* 說明文字裡的長路徑、事件鍵（沒有空白可斷行）在手機上要能斷開 */
 .caption, .cell-note, .help, .note, .flash { overflow-wrap: anywhere; }

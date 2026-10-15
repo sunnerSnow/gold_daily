@@ -4,8 +4,9 @@ import { isDailyDay } from '../schedule';
 import type { EventRow, InstrumentKey, JobTrigger, SettingsRow, SnapshotRow } from '../store/types';
 import { formatAge, parseHhmm, startOfTaipeiDay, taipeiDate, taipeiMinutesOfDay } from '../time';
 import { ensureBaseline, evaluateAndNotify } from './alerts';
+import { dailyChartUrl } from './chart-data';
 import { safeErrorMessage, type JobDeps, type JobOutcome } from './deps';
-import { deliverEvent, MAX_TOTAL_ATTEMPTS, RECOVERABLE_SKIPS } from './notify';
+import { CHART_DROPPED_NOTE, deliverEvent, MAX_TOTAL_ATTEMPTS, RECOVERABLE_SKIPS } from './notify';
 import { getProviderBudget, meteredCall } from './provider-usage';
 import { fetchAndRecord } from './snapshot';
 import { evaluateTargets } from './targets';
@@ -121,10 +122,12 @@ export async function runDailyJob(deps: JobDeps, options: DailyOptions): Promise
     }
     if (existing?.messageText) {
       let event = existing;
+      let imageUrl: string | null = null;
       if (needsDelivery(event, now, { lineConfigured: deps.line.configured, force: options.trigger === 'manual' })) {
-        event = await deliverEvent(deps, event, 'daily', settings);
+        imageUrl = await dailyChartUrl(deps, today);
+        event = await deliverEvent(deps, event, 'daily', settings, { imageUrl });
       }
-      const detail = `補送 ${dailyKey(today)}：${describeEvent(event)}（沿用今天的訊息，未重新查價）`;
+      const detail = `補送 ${dailyKey(today)}：${describeEvent(event)}${withChart(event, imageUrl)}（沿用今天的訊息，未重新查價）`;
       const status = event.status === 'failed' ? 'failed' : 'success';
       await deps.store.finishJobRun(run.id, { status, detail, errorMessage: event.status === 'failed' ? event.lastError : null });
       return { status, detail, jobRunId: run.id, eventIds: [event.id] };
@@ -148,6 +151,7 @@ export async function runDailyJob(deps: JobDeps, options: DailyOptions): Promise
     const change = computeChange(price, reference?.price);
     const messageText = formatDailyMessage({
       price,
+      symbol: quote.symbol,
       currency: quote.currency,
       unit: quote.unit,
       referencePrice: reference?.price ?? null,
@@ -184,11 +188,14 @@ export async function runDailyJob(deps: JobDeps, options: DailyOptions): Promise
         messageText,
       });
       let event = inserted;
+      let imageUrl: string | null = null;
       if (needsDelivery(event, now, { lineConfigured: deps.line.configured, force: options.trigger === 'manual' })) {
-        event = await deliverEvent(deps, event, 'daily', settings);
+        // 過期報價沒有寫入當天的每日快照，畫不出到今天為止的走勢圖，只送文字
+        imageUrl = daily ? await dailyChartUrl(deps, today) : null;
+        event = await deliverEvent(deps, event, 'daily', settings, { imageUrl });
       }
       eventIds.push(event.id);
-      detailParts.push(`推播 ${dailyKey(today)}：${describeEvent(event)}`);
+      detailParts.push(`推播 ${dailyKey(today)}：${describeEvent(event)}${withChart(event, imageUrl)}`);
       if (event.status === 'failed') deliveryError = event.lastError ?? 'LINE 發送失敗';
     }
 
@@ -225,6 +232,12 @@ export async function runDailyJob(deps: JobDeps, options: DailyOptions): Promise
   } finally {
     await deps.store.releaseLock('daily', owner);
   }
+}
+
+/** 排程紀錄裡註明這次有沒有附走勢圖 */
+function withChart(event: EventRow, imageUrl: string | null): string {
+  if (event.status !== 'sent' || !imageUrl) return '';
+  return event.lastError === CHART_DROPPED_NOTE ? '（走勢圖被 LINE 拒絕，只送文字）' : '（附走勢圖）';
 }
 
 export function describeEvent(event: EventRow): string {

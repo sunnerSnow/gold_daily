@@ -100,6 +100,17 @@ describe('環境變數檢查', () => {
     expect(readEnv({ SUPABASE_URL: ' https://abc.supabase.co ' }).SUPABASE_URL).toBe('https://abc.supabase.co');
   });
 
+  it('正式環境判斷不出網站網址或不是 https 時，提示走勢圖不會附上', () => {
+    const urlIssue = (env: Record<string, string>) => checkEnv(readEnv({ NODE_ENV: 'production', ...env })).issues.find((i) => i.key === 'NEXT_PUBLIC_APP_URL');
+    expect(urlIssue({})?.message).toContain('不會附走勢圖');
+    expect(urlIssue({ NEXT_PUBLIC_APP_URL: 'http://gold.example' })?.message).toContain('不是 https');
+    // Vercel 會自動提供正式網域，不用另外設定
+    expect(urlIssue({ VERCEL_PROJECT_PRODUCTION_URL: 'gold-daily-pearl.vercel.app' })).toBeUndefined();
+    expect(urlIssue({ NEXT_PUBLIC_APP_URL: 'https://gold.example' })).toBeUndefined();
+    // 本機開發不提示
+    expect(checkEnv(readEnv({ NEXT_PUBLIC_APP_URL: 'http://localhost:3000' })).issues.some((i) => i.key === 'NEXT_PUBLIC_APP_URL')).toBe(false);
+  });
+
   it('使用 GoldAPI 但沒有金鑰時提示', () => {
     const s = checkEnv(readEnv({ GOLD_PRICE_PROVIDER: 'goldapi' }));
     expect(s.issues.some((i) => i.key === 'GOLD_PRICE_API_KEY')).toBe(true);

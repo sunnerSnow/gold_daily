@@ -10,10 +10,19 @@ export interface LineQuota {
   value: number | null;
 }
 
+/**
+ * 一次推播的內容：文字，加上可選的圖片（必須是公開的 https 網址，LINE 會自己去抓）。
+ * 同一次請求最多 5 個訊息框，LINE 只算 1 則。
+ */
+export interface PushContent {
+  text: string;
+  imageUrl?: string | null;
+}
+
 export interface LineClient {
   readonly configured: boolean;
   /** retryKey 重試時必須沿用同一個值，LINE 端才會去重 */
-  pushText(text: string, retryKey: string): Promise<PushResult>;
+  push(content: PushContent, retryKey: string): Promise<PushResult>;
   getQuota(): Promise<LineQuota>;
   getConsumption(): Promise<{ totalUsage: number }>;
 }
@@ -22,6 +31,14 @@ const API = 'https://api.line.me/v2/bot';
 const TIMEOUT_MS = 10_000;
 /** LINE 單則文字訊息上限 5000 字 */
 export const LINE_TEXT_LIMIT = 5000;
+
+/** 組成 LINE 的 messages 陣列：文字在前、圖片在後 */
+export function toLineMessages({ text, imageUrl }: PushContent) {
+  const messages: Record<string, string>[] = [{ type: 'text', text: text.slice(0, LINE_TEXT_LIMIT) }];
+  // 預覽圖與原圖用同一張（檔案遠小於預覽圖 1 MB 的上限）
+  if (imageUrl) messages.push({ type: 'image', originalContentUrl: imageUrl, previewImageUrl: imageUrl });
+  return messages;
+}
 
 export class LineApiError extends Error {
   constructor(message: string, readonly status: number | null) {
@@ -52,13 +69,13 @@ export class HttpLineClient implements LineClient {
     return { Authorization: `Bearer ${this.token}`, ...extra };
   }
 
-  async pushText(text: string, retryKey: string): Promise<PushResult> {
+  async push(content: PushContent, retryKey: string): Promise<PushResult> {
     let res: Response;
     try {
       res = await this.fetchImpl(`${API}/message/push`, {
         method: 'POST',
         headers: this.headers({ 'Content-Type': 'application/json', 'X-Line-Retry-Key': retryKey }),
-        body: JSON.stringify({ to: this.userId, messages: [{ type: 'text', text: text.slice(0, LINE_TEXT_LIMIT) }] }),
+        body: JSON.stringify({ to: this.userId, messages: toLineMessages(content) }),
         signal: AbortSignal.timeout(TIMEOUT_MS),
         cache: 'no-store',
       });
@@ -106,7 +123,7 @@ export class HttpLineClient implements LineClient {
 /** 沒設定 LINE 時使用：不會呼叫任何外部服務，也不會假裝送出 */
 export class UnconfiguredLineClient implements LineClient {
   readonly configured = false;
-  async pushText(): Promise<PushResult> {
+  async push(): Promise<PushResult> {
     return { ok: false, status: null, retryable: false, error: 'LINE 尚未連線' };
   }
   async getQuota(): Promise<LineQuota> {

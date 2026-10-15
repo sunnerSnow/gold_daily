@@ -1,5 +1,5 @@
 import { MockGoldPriceProvider, type MockScenario } from '../gold/mock-provider';
-import type { LineClient, LineQuota, PushResult } from '../line/client';
+import type { LineClient, LineQuota, PushContent, PushResult } from '../line/client';
 import { MemoryStore } from '../store/memory';
 import type { JobDeps } from './deps';
 
@@ -7,7 +7,7 @@ import type { JobDeps } from './deps';
 
 export class FakeLine implements LineClient {
   configured = true;
-  pushes: { text: string; retryKey: string }[] = [];
+  pushes: { text: string; imageUrl: string | null; retryKey: string }[] = [];
   /** 依序回傳的結果；用完後一律成功 */
   script: PushResult[] = [];
   quota: LineQuota = { type: 'limited', value: 200 };
@@ -15,8 +15,8 @@ export class FakeLine implements LineClient {
   quotaFails = false;
   private delivered = new Set<string>();
 
-  async pushText(text: string, retryKey: string): Promise<PushResult> {
-    this.pushes.push({ text, retryKey });
+  async push({ text, imageUrl }: PushContent, retryKey: string): Promise<PushResult> {
+    this.pushes.push({ text, imageUrl: imageUrl ?? null, retryKey });
     const next = this.script.shift();
     if (next && !next.ok) return next;
     if (this.delivered.has(retryKey)) return { ok: true, duplicate: true };
