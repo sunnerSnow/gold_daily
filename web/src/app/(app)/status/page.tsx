@@ -203,7 +203,7 @@ export default async function StatusPage({ searchParams }: { searchParams: Promi
             <div><dt>官方可用額度</dt><dd>{quota.officialLimit !== null ? `${quota.officialLimit} 則` : quota.verified ? '官方回報無上限，以設定額度為準' : '尚未取得'}</dd></div>
             <div><dt>本月已使用（LINE 官方）</dt><dd>{quota.officialUsed !== null ? `${quota.officialUsed} 則` : '尚未取得'}<span className="cell-note">官方數字為概略值，含其他管道送出的訊息</span></dd></div>
             <div><dt>本地估算剩餘</dt><dd>{quota.localRemaining} 則<span className="cell-note">設定額度 {settings.monthlyMessageQuota} − 本系統已送出</span></dd></div>
-            <div><dt>每日推播保留</dt><dd>{quota.reserveForDaily} 則<span className="cell-note">本月剩餘天數 × 推播人數 {Math.max(1, deps.line.recipientCount)} ＋ 緩衝 {settings.quotaSafetyBuffer}</span></dd></div>
+            <div><dt>每日推播保留</dt><dd>{quota.reserveForDaily} 則<span className="cell-note">本月剩餘天數 × 推播人數 {data.recipients} ＋ 緩衝 {settings.quotaSafetyBuffer}</span></dd></div>
             <div><dt>最近同步</dt><dd className="num">{lastSyncAny ? formatTaipei(lastSyncAny.syncedAt) : '—'}<span className="cell-note">{lastSyncAny ? (lastSyncAny.success ? '成功' : `失敗：${lastSyncAny.errorMessage ?? ''}`) : envStatus.line ? '尚未同步' : 'LINE 尚未連線'}</span></dd></div>
             <div><dt>額度重置</dt><dd>每月 1 日（日本時間）<span className="cell-note">台灣時間月底最後一天 23:00 之後送出的算下個月</span></dd></div>
           </dl>

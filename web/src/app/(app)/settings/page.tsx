@@ -136,7 +136,12 @@ export default async function SettingsPage() {
                 <dd>{env.LINE_CHANNEL_ACCESS_TOKEN ? '已設定（只存在伺服器端）' : '未設定'}</dd>
                 <dt>推播對象</dt>
                 <dd>
-                  {recipientTails.length ? (
+                  {envStatus.line && envStatus.lineTarget === 'all' ? (
+                    <>
+                      官方帳號的所有好友（約 <span className="num">{data.recipients}</span> 人）
+                      <span className="cell-note">人數取自 LINE 前一天的統計；每次推播每人算 1 則額度。改成只送指定的人：設定 LINE_TARGET=list 與 LINE_USER_ID</span>
+                    </>
+                  ) : recipientTails.length ? (
                     <>
                       {recipientTails.length} 人・末 4 碼 <span className="num">{recipientTails.join('、')}</span>
                       {recipientTails.length > 1 ? <span className="cell-note">每次推播每人算 1 則額度</span> : null}

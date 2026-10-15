@@ -50,12 +50,43 @@ describe('HttpLineClient.push', () => {
   it('多位推播對象：用 multicast 一次送給名單上所有人，也帶 retry key', async () => {
     const f = fakeFetch([json(200, {})]);
     const c = new HttpLineClient('t', [USER, USER2], f.impl);
-    expect(c.recipientCount).toBe(2);
+    expect(c.target).toBe('list');
+    expect(await c.getRecipientCount()).toBe(2);
     expect(await c.push(hi, 'k')).toEqual({ ok: true, duplicate: false });
     expect(f.calls).toHaveLength(1);
     expect(f.calls[0].url).toBe('https://api.line.me/v2/bot/message/multicast');
     expect((f.calls[0].init.headers as Record<string, string>)['X-Line-Retry-Key']).toBe('k');
     expect(JSON.parse(String(f.calls[0].init.body))).toEqual({ to: [USER, USER2], messages: [{ type: 'text', text: 'hi' }] });
+  });
+
+  it('所有好友：用 broadcast 群發，不需要 User ID，也帶 retry key', async () => {
+    const f = fakeFetch([json(200, {})]);
+    const c = new HttpLineClient('t-broadcast', 'all', f.impl);
+    expect(c.target).toBe('all');
+    await c.push(hi, 'k');
+    expect(f.calls[0].url).toBe('https://api.line.me/v2/bot/message/broadcast');
+    expect((f.calls[0].init.headers as Record<string, string>)['X-Line-Retry-Key']).toBe('k');
+    expect(JSON.parse(String(f.calls[0].init.body))).toEqual({ messages: [{ type: 'text', text: 'hi' }] });
+  });
+
+  it('群發的人數取自 LINE 前一天（日本時間）的好友統計，並快取', async () => {
+    // 台北 10/15 09:00 = 日本 10/15 10:00 → 查 10/14
+    const now = () => Date.parse('2026-10-15T01:00:00Z');
+    const f = fakeFetch([json(200, { status: 'ready', followers: 3, targetedReaches: 2, blocks: 1 })]);
+    const c = new HttpLineClient('t-followers-1', 'all', f.impl, now);
+    expect(await c.getRecipientCount()).toBe(2);
+    expect(f.calls[0].url).toBe('https://api.line.me/v2/bot/insight/followers?date=20261014');
+    expect(await c.getRecipientCount()).toBe(2);
+    expect(f.calls).toHaveLength(1);
+  });
+
+  it('前一天的統計還沒好就看前兩天；都查不到時先算 1 人，不擋推播', async () => {
+    const now = () => Date.parse('2026-10-15T01:00:00Z');
+    const f = fakeFetch([json(200, { status: 'unready' }), json(200, { status: 'ready', followers: 5, blocks: 1 })]);
+    expect(await new HttpLineClient('t-followers-2', 'all', f.impl, now).getRecipientCount()).toBe(4);
+    expect(f.calls[1].url).toContain('date=20261013');
+    const down = fakeFetch([json(500, {}), new Error('network')]);
+    expect(await new HttpLineClient('t-followers-3', 'all', down.impl, now).getRecipientCount()).toBe(1);
   });
 
   it('回覆用 reply token，不帶 retry key', async () => {

@@ -115,17 +115,21 @@ npm run lint
 2. 帳號設定 → Messaging API → 啟用，建立或選擇 Provider。
 3. 到 [LINE Developers Console](https://developers.line.biz/console/) 打開這個頻道：
    - **Messaging API** 分頁 → Channel access token → Issue，填入 `LINE_CHANNEL_ACCESS_TOKEN`。
-   - **Basic settings** 分頁 → 最下方「Your user ID」（`U` 開頭加 32 個字元），填入 `LINE_USER_ID`。
+   - **Basic settings** 分頁 → 最下方「Your user ID」（`U` 開頭加 32 個字元），填入 `LINE_USER_ID`（只有「只送指定的人」模式需要，見下方〈推播對象〉）。
 4. 用自己的 LINE 掃描官方帳號的 QR code 加為好友（封鎖官方帳號就收不到）。
 5. 部署後到「推播設定」按「發送測試推播」。LINE 收到「Gold Daily 測試推播」、系統狀態頁的額度同步成功，就代表設定完成。
 
 Token 只放在伺服器端環境變數，不會出現在原始碼、前端或 API 回應；畫面只顯示「已設定」與 User ID 末 4 碼。
 
-### 推播給多人（指定名單）
+### 推播對象
 
-推播只送給 `LINE_USER_ID` 裡的人，**加了官方帳號好友不代表會收到**。多人時用逗號分隔，系統用 multicast 一次送給名單上所有人（同樣沿用 retry key 去重）。LINE 依收件人數計算額度：2 人時每次推播用掉 2 則，額度保護也會依人數保留每日推播的份量；剩餘則數不夠送給所有人時整則不送，不會只送一部分人。
+**預設群發給官方帳號的所有好友**（`LINE_TARGET` 不填或填 `all`，用 broadcast）：誰加了好友就會收到，不需要 User ID。LINE 依收件人數計算額度，系統用 LINE 前一天的好友統計（可收到訊息的人數，已扣除封鎖）估算每次推播要用掉幾則；今天新加的好友會少算，實際用量仍以發送前同步的官方用量為準。未認證的官方帳號搜尋名稱找不到，只能用 ID 或 QR code 加入。
 
-取得別人的 User ID（LINE 後台只看得到自己的）：
+**只送指定的人**：設 `LINE_TARGET=list`，推播只送給 `LINE_USER_ID` 裡的人（多人用逗號分隔，用 multicast 一次送出）。
+
+兩種模式都沿用 retry key 去重；額度保護依人數保留每日推播的份量，剩餘則數不夠送給所有人時整則不送，不會只送一部分人。
+
+名單模式下取得別人的 User ID（LINE 後台只看得到自己的）：
 
 1. Vercel 加上環境變數 `LINE_CHANNEL_SECRET`（Basic settings → Channel secret，存成 Sensitive）並重新部署。
 2. LINE Developers Console → **Messaging API** 分頁 → Webhook URL 填 `https://<你的網域>/api/line/webhook` → Verify → 打開 **Use webhook**。LINE Official Account Manager 的「回應設定」也要開啟 Webhook。

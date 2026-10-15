@@ -207,7 +207,8 @@ export async function testPushAction(_prev: ActionState): Promise<ActionState> {
   const { event, withCard } = await sendTestPush(deps);
   const ok = event.status === 'sent';
   revalidatePath('/', 'layout');
-  const people = deps.line.recipientCount > 1 ? `（${deps.line.recipientCount} 人，用掉 ${deps.line.recipientCount} 則額度）` : '';
+  const count = await deps.line.getRecipientCount();
+  const people = deps.line.target === 'all' ? `（送給所有好友，約 ${count} 人，用掉約 ${count} 則額度）` : count > 1 ? `（${count} 人，用掉 ${count} 則額度）` : '';
   return {
     ok,
     message: ok

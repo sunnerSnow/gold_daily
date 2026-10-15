@@ -17,7 +17,12 @@ export interface FakePush {
 
 export class FakeLine implements LineClient {
   configured = true;
+  target: 'all' | 'list' = 'list';
+  /** 推播對象人數（測試可調整，模擬多人或群發） */
   recipientCount = 1;
+  async getRecipientCount() {
+    return this.recipientCount;
+  }
   pushes: FakePush[] = [];
   replies: { replyToken: string; messages: LineMessage[] }[] = [];
   /** 依序回傳的結果；用完後一律成功 */

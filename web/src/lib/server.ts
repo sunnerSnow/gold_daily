@@ -28,7 +28,7 @@ export async function buildDeps(): Promise<JobDeps> {
       mockScenario: settings.mockScenario,
       mockMonthlyQuota: env.MOCK_MONTHLY_QUOTA ? Number(env.MOCK_MONTHLY_QUOTA) || null : null,
     }),
-    line: status.line ? new HttpLineClient(env.LINE_CHANNEL_ACCESS_TOKEN!, parseLineUserIds(env.LINE_USER_ID)) : new UnconfiguredLineClient(),
+    line: status.line ? new HttpLineClient(env.LINE_CHANNEL_ACCESS_TOKEN!, status.lineTarget === 'all' ? 'all' : parseLineUserIds(env.LINE_USER_ID)) : new UnconfiguredLineClient(),
     now: () => new Date(),
     sleep: (ms) => new Promise((r) => setTimeout(r, ms)),
     newId: () => randomUUID(),

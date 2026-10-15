@@ -96,22 +96,39 @@ describe('環境變數檢查', () => {
     expect(parseLineUserIds(`${a}, ${b},${a}`)).toEqual([a, b]);
     expect(parseLineUserIds(`${a}，${b}`)).toEqual([a, b]);
     expect(parseLineUserIds(undefined)).toEqual([]);
-    const ok = checkEnv(readEnv({ LINE_CHANNEL_ACCESS_TOKEN: 'token', LINE_USER_ID: `${a},${b}` }));
-    expect(ok.line).toBe(true);
-    const bad = checkEnv(readEnv({ LINE_CHANNEL_ACCESS_TOKEN: 'token', LINE_USER_ID: `${a},U123` }));
+    const ok = checkEnv(readEnv({ LINE_CHANNEL_ACCESS_TOKEN: 'token', LINE_TARGET: 'list', LINE_USER_ID: `${a},${b}` }));
+    expect(ok).toMatchObject({ line: true, lineTarget: 'list' });
+    const bad = checkEnv(readEnv({ LINE_CHANNEL_ACCESS_TOKEN: 'token', LINE_TARGET: 'list', LINE_USER_ID: `${a},U123` }));
     expect(bad.line).toBe(false);
     expect(bad.issues.find((i) => i.key === 'LINE_USER_ID')?.message).toContain('第 2 個');
     expect(JSON.stringify(bad)).not.toContain(a);
   });
 
+  it('預設群發給所有好友：只要有 token，不需要 LINE_USER_ID', () => {
+    const s = checkEnv(readEnv({ LINE_CHANNEL_ACCESS_TOKEN: 'token' }));
+    expect(s).toMatchObject({ line: true, lineTarget: 'all' });
+    expect(s.issues.some((i) => i.key === 'LINE_USER_ID')).toBe(false);
+    // 群發時名單用不到，格式錯只提示、不影響連線
+    const odd = checkEnv(readEnv({ LINE_CHANNEL_ACCESS_TOKEN: 'token', LINE_USER_ID: 'not-a-user-id' }));
+    expect(odd.line).toBe(true);
+    expect(odd.issues.some((i) => i.key === 'LINE_USER_ID')).toBe(true);
+    // 拼錯的 LINE_TARGET 會提示，並照預設群發
+    const typo = checkEnv(readEnv({ LINE_CHANNEL_ACCESS_TOKEN: 'token', LINE_TARGET: 'everyone' }));
+    expect(typo).toMatchObject({ line: true, lineTarget: 'all' });
+    expect(typo.issues.some((i) => i.key === 'LINE_TARGET')).toBe(true);
+  });
+
   it('缺少 LINE 設定時明確列出，且 LINE 視為未連線', () => {
     const s = checkEnv(readEnv({ GOLD_PRICE_PROVIDER: 'mock' }));
     expect(s.line).toBe(false);
-    expect(s.issues.map((i) => i.key)).toEqual(expect.arrayContaining(['LINE_CHANNEL_ACCESS_TOKEN', 'LINE_USER_ID', 'CRON_SECRET']));
+    expect(s.issues.map((i) => i.key)).toEqual(expect.arrayContaining(['LINE_CHANNEL_ACCESS_TOKEN', 'CRON_SECRET']));
+    const list = checkEnv(readEnv({ LINE_CHANNEL_ACCESS_TOKEN: 'token', LINE_TARGET: 'list' }));
+    expect(list.line).toBe(false);
+    expect(list.issues.some((i) => i.key === 'LINE_USER_ID')).toBe(true);
   });
 
-  it('LINE_USER_ID 格式錯誤也算未連線', () => {
-    const s = checkEnv(readEnv({ LINE_CHANNEL_ACCESS_TOKEN: 'token', LINE_USER_ID: 'not-a-user-id' }));
+  it('名單模式下 LINE_USER_ID 格式錯誤算未連線', () => {
+    const s = checkEnv(readEnv({ LINE_CHANNEL_ACCESS_TOKEN: 'token', LINE_TARGET: 'list', LINE_USER_ID: 'not-a-user-id' }));
     expect(s.line).toBe(false);
     expect(s.issues.some((i) => i.message.includes('格式不正確'))).toBe(true);
   });

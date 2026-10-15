@@ -60,7 +60,7 @@ export async function getQuotaState(
     if (synced?.success) latest = synced;
   }
   // 本地只記錄「送出幾次」，每次送給所有推播對象，所以乘上人數（名單中途變多時會高估，只會更保守）
-  const recipients = Math.max(1, deps.line.recipientCount);
+  const recipients = Math.max(1, await deps.line.getRecipientCount());
   const localSentThisMonth = (await deps.store.countSentSince(startOfLineBillingMonth(now))) * recipients;
   return computeQuotaState({
     now,

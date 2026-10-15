@@ -26,7 +26,9 @@ const schema = z.object({
   SUPABASE_ANON_KEY: optionalText,
   SUPABASE_SERVICE_ROLE_KEY: optionalText,
   LINE_CHANNEL_ACCESS_TOKEN: optionalText,
-  /** 推播名單：一個或多個 LINE User ID，用逗號分隔 */
+  /** 推播對象：all（預設）＝官方帳號所有好友；list＝只送 LINE_USER_ID 名單 */
+  LINE_TARGET: optionalText,
+  /** 推播名單（LINE_TARGET=list 時使用）：一個或多個 LINE User ID，用逗號分隔 */
   LINE_USER_ID: optionalText,
   /** 只有 webhook（好友傳「ID」取得自己的 User ID）需要，用來驗證請求真的來自 LINE */
   LINE_CHANNEL_SECRET: optionalText,
@@ -52,6 +54,8 @@ export interface EnvIssue {
 export interface EnvStatus {
   supabase: boolean;
   line: boolean;
+  /** 推播對象：all＝所有好友（群發），list＝LINE_USER_ID 名單 */
+  lineTarget: 'all' | 'list';
   cron: boolean;
   admin: boolean;
   provider: string | undefined;
@@ -69,6 +73,11 @@ export function parseLineUserIds(value: string | undefined): string[] {
 
 export function isLineUserId(value: string): boolean {
   return LINE_USER_ID_PATTERN.test(value);
+}
+
+/** LINE_TARGET 沒填或填 all 都是群發；只有明確填 list 才改送名單 */
+export function lineTarget(env: Pick<AppEnv, 'LINE_TARGET'>): 'all' | 'list' {
+  return env.LINE_TARGET?.toLowerCase() === 'list' ? 'list' : 'all';
 }
 
 export function readEnv(source: Record<string, string | undefined> = process.env): AppEnv {
@@ -93,16 +102,21 @@ export function checkEnv(env: AppEnv): EnvStatus {
   }
 
   const hasToken = Boolean(env.LINE_CHANNEL_ACCESS_TOKEN);
+  const target = lineTarget(env);
   const userIds = parseLineUserIds(env.LINE_USER_ID);
   const hasUser = userIds.length > 0;
-  let line = hasToken && hasUser;
+  // 群發只需要 token；名單模式還要有格式正確的 User ID
+  let line = hasToken && (target === 'all' || hasUser);
   if (!hasToken) issues.push({ key: 'LINE_CHANNEL_ACCESS_TOKEN', message: '缺少 LINE_CHANNEL_ACCESS_TOKEN，LINE 尚未連線。' });
-  if (!hasUser) issues.push({ key: 'LINE_USER_ID', message: '缺少 LINE_USER_ID，LINE 尚未連線。' });
+  if (env.LINE_TARGET && !['all', 'list'].includes(env.LINE_TARGET.toLowerCase())) {
+    issues.push({ key: 'LINE_TARGET', message: 'LINE_TARGET 只能是 all（所有好友）或 list（LINE_USER_ID 名單），目前視為 all。' });
+  }
+  if (target === 'list' && !hasUser) issues.push({ key: 'LINE_USER_ID', message: '推播對象設為名單（LINE_TARGET=list），但缺少 LINE_USER_ID，LINE 尚未連線。' });
   const badIds = userIds.map((id, i) => (isLineUserId(id) ? 0 : i + 1)).filter(Boolean);
   if (badIds.length) {
     const which = userIds.length > 1 ? `第 ${badIds.join('、')} 個` : '';
     issues.push({ key: 'LINE_USER_ID', message: `LINE_USER_ID ${which}格式不正確（應為 U 開頭加 32 個十六進位字元，多個用逗號分隔）。` });
-    line = false;
+    if (target === 'list') line = false;
   }
 
   let cron = Boolean(env.CRON_SECRET);
@@ -140,6 +154,7 @@ export function checkEnv(env: AppEnv): EnvStatus {
   return {
     supabase,
     line,
+    lineTarget: target,
     cron,
     admin,
     provider: env.GOLD_PRICE_PROVIDER,

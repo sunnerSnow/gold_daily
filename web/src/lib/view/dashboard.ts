@@ -32,6 +32,8 @@ export interface Gauge {
 
 export interface DashboardData {
   now: Date;
+  /** 推播對象人數（群發時是 LINE 統計的好友數），每次推播用掉這麼多則 */
+  recipients: number;
   provider: ProviderStatus;
   instrument: InstrumentKey | null;
   settings: SettingsRow;
@@ -62,7 +64,7 @@ export async function loadDashboard(deps: JobDeps): Promise<DashboardData> {
   const from = taipeiDate(new Date(now.getTime() - 90 * 86_400_000));
 
   // 第一批：彼此獨立的查詢一起送出（資料庫在遠端時，逐一查詢會很慢）
-  const [settings, latest, historyRows, lastDailyRun, lastIntradayRun, lastPush, alerts, latestSync, localSent, allTargets] = await Promise.all([
+  const [settings, latest, historyRows, lastDailyRun, lastIntradayRun, lastPush, alerts, latestSync, localSent, allTargets, recipientCount] = await Promise.all([
     store.getSettings(),
     instrument ? store.getLatestSnapshot(instrument) : Promise.resolve(null),
     instrument ? store.listDailySnapshots({ instrument, from }).then((r) => r.rows) : Promise.resolve([]),
@@ -73,7 +75,9 @@ export async function loadDashboard(deps: JobDeps): Promise<DashboardData> {
     store.getLatestQuotaSync({ successOnly: true }),
     store.countSentSince(startOfLineBillingMonth(now)),
     store.listPriceTargets({ limit: 50 }),
+    deps.line.getRecipientCount(),
   ]);
+  const recipients = Math.max(1, recipientCount);
 
   // 第二批：需要第一批結果的查詢
   const stale = latest ? isStale(latest.quoteTimestamp, now, provider.staleAfterMinutes) : false;
@@ -142,12 +146,13 @@ export async function loadDashboard(deps: JobDeps): Promise<DashboardData> {
       now,
       latestSuccessfulSync: latestSync,
       // 跟發送前的檢查一樣：每次送出都送給所有推播對象
-      localSentThisMonth: localSent * Math.max(1, deps.line.recipientCount),
+      localSentThisMonth: localSent * recipients,
       monthlyMessageQuota: settings.monthlyMessageQuota,
       quotaSafetyBuffer: settings.quotaSafetyBuffer,
       dailyEnabled: settings.dailyEnabled,
-      recipients: Math.max(1, deps.line.recipientCount),
+      recipients,
     }),
+    recipients,
     nextIntradayAt,
     targets,
     targetHistory,
