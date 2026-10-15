@@ -160,8 +160,8 @@ export default async function SettingsPage() {
                 <ActionButton
                   action={testPushAction}
                   label="發送測試推播"
-                  confirm="會用掉 1 則 LINE 訊息額度，確定要發送嗎？"
-                  hint={`會用掉 1 則訊息額度${data.quota.remaining !== null ? `（保守估算剩餘 ${data.quota.remaining} 則）` : ''}。`}
+                  confirm={`會送給${envStatus.lineTarget === 'all' ? '所有好友（約 ' : ''}${data.recipients} 人${envStatus.lineTarget === 'all' ? '）' : ''}，用掉 ${data.recipients} 則 LINE 訊息額度，確定要發送嗎？`}
+                  hint={`會送給${envStatus.lineTarget === 'all' ? '所有好友（約 ' : ''}${data.recipients} 人${envStatus.lineTarget === 'all' ? '）' : ''}，用掉 ${data.recipients} 則訊息額度${data.quota.remaining !== null ? `（保守估算剩餘 ${data.quota.remaining} 則）` : ''}。`}
                 />
                 {lastTest ? (
                   <p className="small">
