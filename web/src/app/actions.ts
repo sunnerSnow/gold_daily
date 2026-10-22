@@ -9,7 +9,7 @@ import { getEnv } from '@/lib/env';
 import { MOCK_SCENARIOS } from '@/lib/gold/mock-provider';
 import { assessQuote } from '@/lib/freshness';
 import { runDailyJob } from '@/lib/jobs/daily';
-import { describeEvent } from '@/lib/jobs/daily';
+import { describeEvent, describeLine, describeTelegram } from '@/lib/jobs/daily';
 import { safeErrorMessage } from '@/lib/jobs/deps';
 import { runIntradayJob } from '@/lib/jobs/intraday';
 import { backfillHistory, runQuotaSyncJob } from '@/lib/jobs/maintenance';
@@ -206,16 +206,30 @@ export async function testPushAction(_prev: ActionState): Promise<ActionState> {
   if (!(await isAdmin())) return DENIED;
   const deps = await buildDeps();
   const { event, withCard } = await sendTestPush(deps);
-  const ok = event.status === 'sent';
   revalidatePath('/', 'layout');
+  const lineOk = event.status === 'sent';
   const count = await deps.line.getRecipientCount();
   const people = deps.line.target === 'all' ? `（送給所有好友，約 ${count} 人，用掉約 ${count} 則額度）` : count > 1 ? `（${count} 人，用掉 ${count} 則額度）` : '';
-  return {
-    ok,
-    message: ok
-      ? `測試推播已送出${withCard ? '，含每日行情卡片' : ''}${people}，請查看 LINE。`
-      : `測試推播${describeEvent(event)}${event.lastError ? `：${event.lastError}` : ''}`,
-  };
+  // 沒有送 Telegram：跟原本一樣只回報 LINE
+  if (event.telegramStatus === null) {
+    return {
+      ok: lineOk,
+      message: lineOk
+        ? `測試推播已送出${withCard ? '，含每日行情卡片' : ''}${people}，請查看 LINE。`
+        : `測試推播${describeEvent(event)}${event.lastError ? `：${event.lastError}` : ''}`,
+    };
+  }
+  const telegramOk = event.telegramStatus === 'sent';
+  const parts: string[] = [];
+  if (deps.line.configured) {
+    parts.push(lineOk ? `LINE 已送出${withCard ? '，含每日行情卡片' : ''}${people}` : `LINE ${describeLine(event)}${event.lastError ? `：${event.lastError}` : ''}`);
+  }
+  parts.push(
+    telegramOk
+      ? `Telegram 已送出（${deps.telegram.chatIds.length} 個聊天室${event.telegramLastError ? `，${event.telegramLastError}` : ''}）`
+      : `Telegram ${describeTelegram(event)}${event.telegramLastError ? `：${event.telegramLastError}` : ''}`,
+  );
+  return { ok: telegramOk && (lineOk || !deps.line.configured), message: `測試推播：${parts.join('；')}。` };
 }
 
 export async function retryEventAction(_prev: ActionState, formData: FormData): Promise<ActionState> {

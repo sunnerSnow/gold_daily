@@ -13,6 +13,7 @@ export interface Chrome {
   provider: ProviderStatus;
   feed: FeedState;
   lineConfigured: boolean;
+  telegramConfigured: boolean;
   storeKind: 'supabase' | 'memory';
   auth: AuthMode;
 }
@@ -34,6 +35,7 @@ export async function loadChrome(deps: JobDeps): Promise<Chrome> {
     provider,
     feed,
     lineConfigured: status.line,
+    telegramConfigured: status.telegram,
     storeKind: deps.store.kind,
     auth: authMode(env),
   };

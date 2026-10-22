@@ -1,13 +1,12 @@
 import { computeChange } from '../gold/math';
-import { buildDailyCard, type FlexMessage } from '../line/flex';
 import { formatDailyMessage, type DailyMessageInput } from '../line/messages';
 import { isDailyDay } from '../schedule';
 import type { EventRow, InstrumentKey, JobTrigger, SettingsRow, SnapshotRow } from '../store/types';
 import { formatAge, parseHhmm, startOfTaipeiDay, taipeiDate, taipeiMinutesOfDay } from '../time';
 import { ensureBaseline, evaluateAndNotify } from './alerts';
-import { dailyCard, dailyChartUrl } from './chart-data';
+import { buildDailyMessages, dailyChartUrl, dailyMessages, type DailyMessages } from './chart-data';
 import { safeErrorMessage, type JobDeps, type JobOutcome } from './deps';
-import { CARD_DROPPED_NOTE, deliverEvent, MAX_TOTAL_ATTEMPTS, RECOVERABLE_SKIPS } from './notify';
+import { CARD_DROPPED_NOTE, deliverEvent, deliveryFailure, MAX_TOTAL_ATTEMPTS, PHOTO_DROPPED_NOTE, RECOVERABLE_SKIPS } from './notify';
 import { getProviderBudget, meteredCall } from './provider-usage';
 import { fetchAndRecord } from './snapshot';
 import { evaluateTargets } from './targets';
@@ -27,12 +26,23 @@ const MAX_FETCH_FAILURES_PER_DAY = 3;
 
 export const dailyKey = (date: string) => `daily:${date}`;
 
+interface DeliveryOptions {
+  lineConfigured: boolean;
+  telegramConfigured: boolean;
+  force?: boolean;
+}
+
+/** 今天的每日推播事件是否還需要處理：LINE 或 Telegram 任一邊還沒送完 */
+function needsDelivery(event: EventRow | null, now: Date, opts: DeliveryOptions): boolean {
+  if (!event) return true;
+  return lineNeedsDelivery(event, now, opts) || telegramNeedsDelivery(event, now, opts);
+}
+
 /**
- * 今天的每日推播事件是否還需要處理。
+ * LINE 這一邊還需要處理。
  * force（手動執行）時，可恢復的略過一律再試一次，例如剛設定好 LINE。
  */
-function needsDelivery(event: EventRow | null, now: Date, opts: { lineConfigured: boolean; force?: boolean }): boolean {
-  if (!event) return true;
+function lineNeedsDelivery(event: EventRow, now: Date, opts: DeliveryOptions): boolean {
   switch (event.status) {
     case 'sent':
       return false;
@@ -44,6 +54,21 @@ function needsDelivery(event: EventRow | null, now: Date, opts: { lineConfigured
       // LINE 還沒連線就不用重跑；額度問題每小時最多再確認一次
       if (event.skipReason === 'line_not_configured') return opts.lineConfigured;
       return now.getTime() - event.updatedAt.getTime() > QUOTA_RECHECK_MS;
+    case 'sending':
+      return now.getTime() - event.updatedAt.getTime() > STUCK_SENDING_MS;
+    default:
+      return true;
+  }
+}
+
+/** Telegram 這一邊還需要處理；還沒送過（例如今天稍晚才設定好 Telegram）也算 */
+function telegramNeedsDelivery(event: EventRow, now: Date, opts: DeliveryOptions): boolean {
+  if (!opts.telegramConfigured || !event.messageText) return false;
+  switch (event.telegramStatus) {
+    case 'sent':
+      return false;
+    case 'failed':
+      return event.telegramAttemptCount < MAX_TOTAL_ATTEMPTS;
     case 'sending':
       return now.getTime() - event.updatedAt.getTime() > STUCK_SENDING_MS;
     default:
@@ -88,6 +113,8 @@ export async function runDailyJob(deps: JobDeps, options: DailyOptions): Promise
   const now = deps.now();
   const today = taipeiDate(now);
   const settings = await deps.store.getSettings();
+  const channels = { lineConfigured: deps.line.configured, telegramConfigured: deps.telegram.configured };
+  const force = options.trigger === 'manual';
 
   if (options.trigger === 'cron') {
     if (!settings.dailyEnabled) return { status: 'disabled', detail: '每日推播已停用' };
@@ -95,7 +122,7 @@ export async function runDailyJob(deps: JobDeps, options: DailyOptions): Promise
     const pushAt = parseHhmm(settings.dailyPushTime) ?? 9 * 60;
     if (taipeiMinutesOfDay(now) < pushAt) return { status: 'not_due', detail: `尚未到推播時間 ${settings.dailyPushTime}` };
     const existing = await deps.store.getEventByKey(dailyKey(today));
-    if (existing && !needsDelivery(existing, now, { lineConfigured: deps.line.configured })) {
+    if (existing && !needsDelivery(existing, now, channels)) {
       return { status: 'not_due', detail: '今天的每日推播已處理' };
     }
     if (!existing) {
@@ -116,22 +143,23 @@ export async function runDailyJob(deps: JobDeps, options: DailyOptions): Promise
   try {
     // 今天的訊息已經產生：只補送，不再查價
     const existing = await deps.store.getEventByKey(dailyKey(today));
-    if (existing?.status === 'sent') {
+    if (existing?.status === 'sent' && !telegramNeedsDelivery(existing, now, channels)) {
       const detail = `今天已推播（${dailyKey(today)}），未重複送出`;
       await deps.store.finishJobRun(run.id, { status: 'skipped', detail });
       return { status: 'skipped', detail, jobRunId: run.id, eventIds: [existing.id] };
     }
     if (existing?.messageText) {
       let event = existing;
-      let built: { card: FlexMessage; withChart: boolean } | null = null;
-      if (needsDelivery(event, now, { lineConfigured: deps.line.configured, force: options.trigger === 'manual' })) {
+      let built: DailyMessages | null = null;
+      if (needsDelivery(event, now, { ...channels, force })) {
         // 卡片從資料庫重建（今天的每日快照＋前一交易日），數字跟早上產生的文字一樣
-        built = await dailyCard(deps, today);
-        event = await deliverEvent(deps, event, 'daily', settings, { messages: built ? [built.card] : null });
+        built = await dailyMessages(deps, today);
+        event = await deliverEvent(deps, event, 'daily', settings, { messages: built ? [built.card] : null, telegram: built?.telegram });
       }
-      const detail = `補送 ${dailyKey(today)}：${describeEvent(event)}${deliveredAs(event, built)}（沿用今天的訊息，未重新查價）`;
-      const status = event.status === 'failed' ? 'failed' : 'success';
-      await deps.store.finishJobRun(run.id, { status, detail, errorMessage: event.status === 'failed' ? event.lastError : null });
+      const detail = `補送 ${dailyKey(today)}：${describeEvent(event, built)}（沿用今天的訊息，未重新查價）`;
+      const failure = deliveryFailure(event);
+      const status = failure ? 'failed' : 'success';
+      await deps.store.finishJobRun(run.id, { status, detail, errorMessage: failure });
       return { status, detail, jobRunId: run.id, eventIds: [event.id] };
     }
 
@@ -192,19 +220,15 @@ export async function runDailyJob(deps: JobDeps, options: DailyOptions): Promise
         messageText,
       });
       let event = inserted;
-      let built: { card: FlexMessage; withChart: boolean } | null = null;
-      if (needsDelivery(event, now, { lineConfigured: deps.line.configured, force: options.trigger === 'manual' })) {
+      let built: DailyMessages | null = null;
+      if (needsDelivery(event, now, { ...channels, force })) {
         // 過期報價沒有寫入當天的每日快照：不做卡片（補送時也重建不出來），改送純文字
-        if (daily) {
-          const chartUrl = await dailyChartUrl(deps, today);
-          const card = buildDailyCard(messageInput, chartUrl);
-          built = card ? { card, withChart: chartUrl !== null } : null;
-        }
-        event = await deliverEvent(deps, event, 'daily', settings, { messages: built ? [built.card] : null });
+        if (daily) built = buildDailyMessages(messageInput, await dailyChartUrl(deps, today));
+        event = await deliverEvent(deps, event, 'daily', settings, { messages: built ? [built.card] : null, telegram: built?.telegram });
       }
       eventIds.push(event.id);
-      detailParts.push(`推播 ${dailyKey(today)}：${describeEvent(event)}${deliveredAs(event, built)}`);
-      if (event.status === 'failed') deliveryError = event.lastError ?? 'LINE 發送失敗';
+      detailParts.push(`推播 ${dailyKey(today)}：${describeEvent(event, built)}`);
+      deliveryError = deliveryFailure(event);
     }
 
     // 每日查價也是一次異動提醒與到價提醒的檢查（過期報價不判斷）
@@ -242,14 +266,46 @@ export async function runDailyJob(deps: JobDeps, options: DailyOptions): Promise
   }
 }
 
+/**
+ * 事件的發送狀態。沒有送 Telegram 時只描述 LINE（跟原本一樣）；
+ * 有送 Telegram 時兩邊都列出，LINE 沒設定就只列 Telegram。
+ * built：每日推播這次送出的卡片／圖片，排程紀錄裡註明用什麼格式送出。
+ */
+export function describeEvent(event: EventRow, built?: { withChart: boolean } | null): string {
+  const line = `${describeLine(event)}${lineFormat(event, built)}`;
+  if (event.telegramStatus === null) return line;
+  const telegram = `Telegram ${describeTelegram(event)}${telegramFormat(event, built)}`;
+  if (event.status === 'skipped' && event.skipReason === 'line_not_configured') return telegram;
+  return `LINE ${line}・${telegram}`;
+}
+
 /** 排程紀錄裡註明這次是用卡片還是純文字送出 */
-function deliveredAs(event: EventRow, built: { withChart: boolean } | null): string {
+function lineFormat(event: EventRow, built: { withChart: boolean } | null | undefined): string {
   if (event.status !== 'sent' || !built) return '';
   if (event.lastError === CARD_DROPPED_NOTE) return '（卡片被 LINE 拒絕，改送純文字）';
   return built.withChart ? '（卡片＋走勢圖）' : '（卡片）';
 }
 
-export function describeEvent(event: EventRow): string {
+function telegramFormat(event: EventRow, built: { withChart: boolean } | null | undefined): string {
+  if (event.telegramStatus !== 'sent' || !built?.withChart) return '';
+  return event.telegramLastError === PHOTO_DROPPED_NOTE ? `（${PHOTO_DROPPED_NOTE}）` : '（走勢圖）';
+}
+
+export function describeTelegram(event: EventRow): string {
+  switch (event.telegramStatus) {
+    case 'sent':
+      return '已送出';
+    case 'failed':
+      return `發送失敗（第 ${event.telegramAttemptCount} 次）`;
+    case 'sending':
+      return '發送中';
+    default:
+      return '未發送';
+  }
+}
+
+/** LINE 這一邊的發送狀態 */
+export function describeLine(event: EventRow): string {
   switch (event.status) {
     case 'sent':
       return '已送出';

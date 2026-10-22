@@ -32,6 +32,10 @@ const schema = z.object({
   LINE_USER_ID: optionalText,
   /** 只有 webhook（好友傳「ID」取得自己的 User ID）需要，用來驗證請求真的來自 LINE */
   LINE_CHANNEL_SECRET: optionalText,
+  /** Telegram Bot 的 token（@BotFather 建立 bot 時給的） */
+  TELEGRAM_BOT_TOKEN: optionalText,
+  /** Telegram 推播對象：一個或多個 chat ID（個人、群組，或頻道的 @username），用逗號分隔 */
+  TELEGRAM_CHAT_ID: optionalText,
   GOLD_PRICE_PROVIDER: optionalText,
   GOLD_PRICE_API_KEY: optionalText,
   CRON_SECRET: optionalText,
@@ -56,6 +60,8 @@ export interface EnvStatus {
   line: boolean;
   /** 推播對象：all＝所有好友（群發），list＝LINE_USER_ID 名單 */
   lineTarget: 'all' | 'list';
+  /** Telegram 是選用的：沒設定不算問題，只有設定一半或格式錯才提示 */
+  telegram: boolean;
   cron: boolean;
   admin: boolean;
   provider: string | undefined;
@@ -65,14 +71,33 @@ export interface EnvStatus {
 
 const LINE_USER_ID_PATTERN = /^U[0-9a-f]{32}$/;
 
-/** LINE_USER_ID 可以填多個，用逗號（或空白）分隔；重複的只算一次 */
-export function parseLineUserIds(value: string | undefined): string[] {
+/** 用逗號（或空白）分隔的清單；重複的只算一次 */
+function splitList(value: string | undefined): string[] {
   if (!value) return [];
   return [...new Set(value.split(/[\s,，]+/).filter(Boolean))];
 }
 
+/** LINE_USER_ID 可以填多個，用逗號（或空白）分隔；重複的只算一次 */
+export function parseLineUserIds(value: string | undefined): string[] {
+  return splitList(value);
+}
+
 export function isLineUserId(value: string): boolean {
   return LINE_USER_ID_PATTERN.test(value);
+}
+
+/** 數字 ID（群組、頻道是負數）或公開頻道的 @username */
+const TELEGRAM_CHAT_ID_PATTERN = /^(-?\d+|@[A-Za-z]\w{3,31})$/;
+/** @BotFather 給的 token：數字 ID、冒號、一串英數字 */
+const TELEGRAM_TOKEN_PATTERN = /^\d+:[\w-]+$/;
+
+/** TELEGRAM_CHAT_ID 可以填多個，用逗號（或空白）分隔；重複的只算一次 */
+export function parseTelegramChatIds(value: string | undefined): string[] {
+  return splitList(value);
+}
+
+export function isTelegramChatId(value: string): boolean {
+  return TELEGRAM_CHAT_ID_PATTERN.test(value);
 }
 
 /** LINE_TARGET 沒填或填 all 都是群發；只有明確填 list 才改送名單 */
@@ -101,13 +126,31 @@ export function checkEnv(env: AppEnv): EnvStatus {
     supabase = false;
   }
 
+  // Telegram 是選用的：兩個都沒填不算問題，填一半或格式錯才提示
+  const hasBotToken = Boolean(env.TELEGRAM_BOT_TOKEN);
+  const chatIds = parseTelegramChatIds(env.TELEGRAM_CHAT_ID);
+  let telegram = hasBotToken && chatIds.length > 0;
+  if (hasBotToken && !TELEGRAM_TOKEN_PATTERN.test(env.TELEGRAM_BOT_TOKEN!)) {
+    issues.push({ key: 'TELEGRAM_BOT_TOKEN', message: 'TELEGRAM_BOT_TOKEN 格式不正確（應為 @BotFather 給的「數字:英數字」），Telegram 尚未連線。' });
+    telegram = false;
+  }
+  if (hasBotToken && chatIds.length === 0) issues.push({ key: 'TELEGRAM_CHAT_ID', message: '有 TELEGRAM_BOT_TOKEN 但缺少 TELEGRAM_CHAT_ID，Telegram 尚未連線。' });
+  if (!hasBotToken && chatIds.length > 0) issues.push({ key: 'TELEGRAM_BOT_TOKEN', message: '有 TELEGRAM_CHAT_ID 但缺少 TELEGRAM_BOT_TOKEN，Telegram 尚未連線。' });
+  const badChats = chatIds.map((id, i) => (isTelegramChatId(id) ? 0 : i + 1)).filter(Boolean);
+  if (badChats.length) {
+    const which = chatIds.length > 1 ? `第 ${badChats.join('、')} 個` : '';
+    issues.push({ key: 'TELEGRAM_CHAT_ID', message: `TELEGRAM_CHAT_ID ${which}格式不正確（應為數字 ID 或頻道的 @username，多個用逗號分隔），Telegram 尚未連線。` });
+    telegram = false;
+  }
+
   const hasToken = Boolean(env.LINE_CHANNEL_ACCESS_TOKEN);
   const target = lineTarget(env);
   const userIds = parseLineUserIds(env.LINE_USER_ID);
   const hasUser = userIds.length > 0;
   // 群發只需要 token；名單模式還要有格式正確的 User ID
   let line = hasToken && (target === 'all' || hasUser);
-  if (!hasToken) issues.push({ key: 'LINE_CHANNEL_ACCESS_TOKEN', message: '缺少 LINE_CHANNEL_ACCESS_TOKEN，LINE 尚未連線。' });
+  // 只用 Telegram 推播時，沒設定 LINE 不算問題
+  if (!hasToken && !telegram) issues.push({ key: 'LINE_CHANNEL_ACCESS_TOKEN', message: '缺少 LINE_CHANNEL_ACCESS_TOKEN，LINE 尚未連線。' });
   if (env.LINE_TARGET && !['all', 'list'].includes(env.LINE_TARGET.toLowerCase())) {
     issues.push({ key: 'LINE_TARGET', message: 'LINE_TARGET 只能是 all（所有好友）或 list（LINE_USER_ID 名單），目前視為 all。' });
   }
@@ -155,6 +198,7 @@ export function checkEnv(env: AppEnv): EnvStatus {
     supabase,
     line,
     lineTarget: target,
+    telegram,
     cron,
     admin,
     provider: env.GOLD_PRICE_PROVIDER,

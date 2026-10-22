@@ -7,7 +7,7 @@ import { PageHead } from '@/components/site-chrome';
 import { EventStatusChip } from '@/components/status-chips';
 import { MockScenarioForm } from '@/components/mock-scenario-form';
 import { chartPath } from '@/lib/chart/daily-chart';
-import { checkEnv, getEnv, parseLineUserIds } from '@/lib/env';
+import { checkEnv, getEnv, parseLineUserIds, parseTelegramChatIds } from '@/lib/env';
 import { formatPrice } from '@/lib/gold/math';
 import { PROVIDER_SAFETY_MARGIN } from '@/lib/gold/budget';
 import { MOCK_SCENARIOS } from '@/lib/gold/mock-provider';
@@ -16,6 +16,7 @@ import { describeEvent } from '@/lib/jobs/daily';
 import { hasIntradayChecks } from '@/lib/schedule';
 import { UNIT_LABEL } from '@/lib/gold/types';
 import { getPageDeps } from '@/lib/server';
+import { chatLabel } from '@/lib/telegram/client';
 import { formatTaipei, taipeiDate } from '@/lib/time';
 import { loadDashboard } from '@/lib/view/dashboard';
 
@@ -52,6 +53,18 @@ export default async function SettingsPage() {
   const lastTest = (await deps.store.listEvents({ types: ['test'], limit: 1 }))[0] ?? null;
   // 只顯示每個 User ID 的末 4 碼
   const recipientTails = envStatus.line ? parseLineUserIds(env.LINE_USER_ID).map((id) => id.slice(-4)) : [];
+  // Telegram 聊天室：頻道 @username 原樣顯示，數字 ID 只顯示末 4 碼
+  const telegramChats = parseTelegramChatIds(env.TELEGRAM_CHAT_ID);
+  const telegramNote = envStatus.telegram ? `同時送到 Telegram（${telegramChats.length} 個聊天室，不占 LINE 額度）。` : '';
+  const lineAudience = `會送給${envStatus.lineTarget === 'all' ? '所有好友（約 ' : ''}${data.recipients} 人${envStatus.lineTarget === 'all' ? '）' : ''}`;
+  const testHint =
+    !envStatus.line && envStatus.telegram
+      ? `LINE 尚未連線，只會送到 Telegram（${telegramChats.length} 個聊天室）。`
+      : `${lineAudience}，用掉 ${data.recipients} 則訊息額度${data.quota.remaining !== null ? `（保守估算剩餘 ${data.quota.remaining} 則）` : ''}。${telegramNote}`;
+  const testConfirm =
+    !envStatus.line && envStatus.telegram
+      ? `會送到 Telegram（${telegramChats.length} 個聊天室），確定要發送嗎？`
+      : `${lineAudience}，用掉 ${data.recipients} 則 LINE 訊息額度${envStatus.telegram ? '，並同時送到 Telegram' : ''}，確定要發送嗎？`;
 
   const quota = data.provider.monthlyCallQuota;
   const targetEvents = new Map(
@@ -157,18 +170,46 @@ export default async function SettingsPage() {
                 <p className="small">LINE 尚未連線，每日推播與提醒都只會記錄為「未發送」，不會假裝送出。設定步驟見 README。</p>
               ) : null}
               <div className="divider" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                <ActionButton
-                  action={testPushAction}
-                  label="發送測試推播"
-                  confirm={`會送給${envStatus.lineTarget === 'all' ? '所有好友（約 ' : ''}${data.recipients} 人${envStatus.lineTarget === 'all' ? '）' : ''}，用掉 ${data.recipients} 則 LINE 訊息額度，確定要發送嗎？`}
-                  hint={`會送給${envStatus.lineTarget === 'all' ? '所有好友（約 ' : ''}${data.recipients} 人${envStatus.lineTarget === 'all' ? '）' : ''}，用掉 ${data.recipients} 則訊息額度${data.quota.remaining !== null ? `（保守估算剩餘 ${data.quota.remaining} 則）` : ''}。`}
-                />
+                <ActionButton action={testPushAction} label="發送測試推播" confirm={testConfirm} hint={testHint} />
                 {lastTest ? (
                   <p className="small">
                     上次測試：<span className="num">{formatTaipei(lastTest.createdAt, false).slice(5)}</span> <EventStatusChip event={lastTest} />
                   </p>
                 ) : null}
               </div>
+            </section>
+
+            <section className={`card card--tight${envStatus.telegram ? ' tint tint--green' : ''}`} aria-labelledby="tg-h">
+              <div className="card-head" style={{ alignItems: 'flex-start' }}>
+                <div className="head-stack">
+                  <p className="eyebrow">Telegram</p>
+                  <h2 className="card-title" id="tg-h">Telegram 連線</h2>
+                </div>
+                <span className={`chip ${envStatus.telegram ? 'chip--ok' : 'chip--muted'}`}>
+                  <span className="dot" />
+                  {envStatus.telegram ? '已設定' : '未設定（選用）'}
+                </span>
+              </div>
+              <dl className="kv-list">
+                <dt>Bot Token</dt>
+                <dd>{env.TELEGRAM_BOT_TOKEN ? '已設定（只存在伺服器端）' : '未設定'}</dd>
+                <dt>推播對象</dt>
+                <dd>
+                  {envStatus.telegram ? (
+                    <>
+                      {telegramChats.length} 個聊天室・<span className="num">{telegramChats.map(chatLabel).join('、')}</span>
+                      <span className="cell-note">Telegram 不限則數，不占 LINE 額度</span>
+                    </>
+                  ) : env.TELEGRAM_CHAT_ID ? (
+                    '設定不完整，詳見系統狀態的設定檢查'
+                  ) : (
+                    '未設定'
+                  )}
+                </dd>
+              </dl>
+              {!envStatus.telegram ? (
+                <p className="small">選用。設定 TELEGRAM_BOT_TOKEN 與 TELEGRAM_CHAT_ID 後，每日推播與提醒會同時送到 Telegram。設定步驟見 README。</p>
+              ) : null}
             </section>
 
             {data.provider.isMock ? (
@@ -194,7 +235,8 @@ export default async function SettingsPage() {
               ) : null}
               {latestDaily ? (
                 <p className="caption">
-                  取自 {latestDaily.dailyDate} 的每日快照。LINE 上是卡片樣式：漲跌上色（漲紅、跌綠），走勢圖在文字下方；按「發送測試推播」可以看到實際樣子。
+                  取自 {latestDaily.dailyDate} 的每日快照。LINE 上是卡片樣式：漲跌上色（漲紅、跌綠），走勢圖在文字下方；
+                  {envStatus.telegram ? 'Telegram 上是走勢圖加說明文字（價格與漲跌加粗）；' : null}按「發送測試推播」可以看到實際樣子。
                 </p>
               ) : null}
             </section>

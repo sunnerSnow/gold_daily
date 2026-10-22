@@ -27,6 +27,7 @@ import {
   type SnapshotRow,
   type Store,
   type TargetStatus,
+  type TelegramStatus,
 } from './types';
 
 // Supabase 實作：只在伺服器端用 service_role 金鑰。錯誤訊息不帶任何金鑰或連線字串。
@@ -129,6 +130,12 @@ function toEvent(r: Row): EventRow {
     attemptCount: Number(r.attempt_count),
     lastError: (r.last_error as string | null) ?? null,
     sentAt: date(r.sent_at),
+    // 還沒執行 Telegram migration 時這些欄位不存在，讀出來是預設值（沒設定 Telegram 就不會寫入）
+    telegramStatus: (r.telegram_status as TelegramStatus | null | undefined) ?? null,
+    telegramSentTo: Array.isArray(r.telegram_sent_to) ? r.telegram_sent_to.map(String) : [],
+    telegramAttemptCount: Number(r.telegram_attempt_count ?? 0),
+    telegramLastError: (r.telegram_last_error as string | null | undefined) ?? null,
+    telegramSentAt: date(r.telegram_sent_at),
     createdAt: new Date(String(r.created_at)),
     updatedAt: new Date(String(r.updated_at)),
   };
@@ -350,6 +357,11 @@ export class SupabaseStore implements Store {
     if (patch.lastError !== undefined) row.last_error = patch.lastError;
     if (patch.sentAt !== undefined) row.sent_at = patch.sentAt?.toISOString() ?? null;
     if (patch.messageText !== undefined) row.message_text = patch.messageText;
+    if (patch.telegramStatus !== undefined) row.telegram_status = patch.telegramStatus;
+    if (patch.telegramSentTo !== undefined) row.telegram_sent_to = patch.telegramSentTo;
+    if (patch.telegramAttemptCount !== undefined) row.telegram_attempt_count = patch.telegramAttemptCount;
+    if (patch.telegramLastError !== undefined) row.telegram_last_error = patch.telegramLastError;
+    if (patch.telegramSentAt !== undefined) row.telegram_sent_at = patch.telegramSentAt?.toISOString() ?? null;
     const r = await this.db.from('notification_events').update(row).eq('id', id).select().single();
     if (r.error) throw new StoreError('更新通知事件', r.error);
     return toEvent(r.data);

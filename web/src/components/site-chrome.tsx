@@ -56,9 +56,16 @@ export function SiteHeader({ chrome }: { chrome: Chrome }) {
             <span className="dot" />
             <span>{feedLabel(chrome)}</span>
           </span>
-          <span className={`hchip ${chrome.lineConfigured ? 'hchip--blue' : 'hchip--red'}`}>
+          {/* Telegram 是選用的：有設定才併進同一個標籤，沒設定不當成問題 */}
+          <span className={`hchip ${chrome.lineConfigured || chrome.telegramConfigured ? 'hchip--blue' : 'hchip--red'}`}>
             <span className="dot" />
-            {chrome.lineConfigured ? 'LINE 已設定' : 'LINE 尚未連線'}
+            {chrome.lineConfigured && chrome.telegramConfigured
+              ? 'LINE・Telegram 已設定'
+              : chrome.telegramConfigured
+                ? 'Telegram 已設定'
+                : chrome.lineConfigured
+                  ? 'LINE 已設定'
+                  : 'LINE 尚未連線'}
           </span>
         </div>
       </div>

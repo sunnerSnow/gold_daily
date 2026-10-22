@@ -204,8 +204,8 @@ export function formatTargetMessage(i: TargetMessageInput): string {
 }
 
 /** withCard：後面會接著一張每日行情卡片（最新一筆每日快照），讓測試推播也能看到實際樣子 */
-export function formatTestMessage(now: Date, withCard = false): string {
-  const lines = ['✅ Gold Daily 測試推播', `發送時間：${formatTaipei(now)}`, '收到這則訊息代表 LINE 推播設定正確。'];
+export function formatTestMessage(now: Date, withCard = false, channel: 'LINE' | 'Telegram' = 'LINE'): string {
+  const lines = ['✅ Gold Daily 測試推播', `發送時間：${formatTaipei(now)}`, `收到這則訊息代表 ${channel} 推播設定正確。`];
   if (withCard) lines.push('', '下面是每日行情卡片的預覽（最新一筆每日快照，不是即時查價）。');
   return lines.join('\n');
 }

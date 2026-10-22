@@ -4,11 +4,12 @@ import { cookies } from 'next/headers';
 import { cache } from 'react';
 import { authMode, SESSION_COOKIE, verifySessionToken } from './auth/session';
 import { resolveAppUrl } from './chart/daily-chart';
-import { checkEnv, getEnv, parseLineUserIds } from './env';
+import { checkEnv, getEnv, parseLineUserIds, parseTelegramChatIds } from './env';
 import { createProvider } from './gold/registry';
 import type { JobDeps } from './jobs/deps';
 import { HttpLineClient, UnconfiguredLineClient } from './line/client';
 import { getStore } from './store';
+import { HttpTelegramClient, UnconfiguredTelegramClient } from './telegram/client';
 
 // 伺服器端組裝依賴：Route Handler、Server Action、頁面都從這裡拿。
 
@@ -29,6 +30,7 @@ export async function buildDeps(): Promise<JobDeps> {
       mockMonthlyQuota: env.MOCK_MONTHLY_QUOTA ? Number(env.MOCK_MONTHLY_QUOTA) || null : null,
     }),
     line: status.line ? new HttpLineClient(env.LINE_CHANNEL_ACCESS_TOKEN!, status.lineTarget === 'all' ? 'all' : parseLineUserIds(env.LINE_USER_ID)) : new UnconfiguredLineClient(),
+    telegram: status.telegram ? new HttpTelegramClient(env.TELEGRAM_BOT_TOKEN!, parseTelegramChatIds(env.TELEGRAM_CHAT_ID)) : new UnconfiguredTelegramClient(),
     now: () => new Date(),
     sleep: (ms) => new Promise((r) => setTimeout(r, ms)),
     newId: () => randomUUID(),

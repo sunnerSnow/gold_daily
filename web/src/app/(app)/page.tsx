@@ -272,7 +272,7 @@ function Dashboard({ data }: { data: DashboardData }) {
             <section className="card card--tight tint tint--green" aria-labelledby="line-h">
               <div className="card-head" style={{ alignItems: 'flex-start' }}>
                 <div className="head-stack">
-                  <p className="eyebrow">LINE</p>
+                  <p className="eyebrow">{data.lastPush?.telegramStatus ? 'LINE・Telegram' : 'LINE'}</p>
                   <h2 className="card-title" id="line-h">最近一次推播</h2>
                 </div>
                 {data.lastPush ? <EventStatusChip event={data.lastPush} /> : null}
@@ -328,7 +328,15 @@ function FirstRun({ data }: { data: DashboardData }) {
   const steps = [
     { title: '資料庫（Supabase）', done: env.supabase, chip: env.supabase ? ['chip--ok', '已連線'] : ['chip--warn', '使用記憶體'], desc: env.supabase ? '資料會保存在 Supabase。' : '未設定 SUPABASE_URL／SUPABASE_SERVICE_ROLE_KEY，資料只存在記憶體，重啟就清空。' },
     { title: '行情來源', done: data.provider.configured && !data.provider.isMock, chip: data.provider.isMock ? ['chip--mock', '使用 Mock'] : data.provider.configured ? ['chip--ok', '已設定'] : ['chip--err', '未設定'], desc: data.provider.isMock ? 'GOLD_PRICE_PROVIDER=mock。正式來源要先確認授權，進度見系統狀態。' : data.provider.notes.join(' ') },
-    { title: 'LINE 推播', done: env.line, chip: env.line ? ['chip--ok', '已設定'] : ['chip--err', '尚未連線'], desc: env.line ? '已設定 Channel Access Token 與 User ID。' : '缺少 LINE_CHANNEL_ACCESS_TOKEN 或 LINE_USER_ID。設定完成前不會送出任何訊息，步驟見 README。' },
+    {
+      title: 'LINE／Telegram 推播',
+      done: env.line || env.telegram,
+      chip: env.line && env.telegram ? ['chip--ok', '兩邊都已設定'] : env.line ? ['chip--ok', 'LINE 已設定'] : env.telegram ? ['chip--ok', 'Telegram 已設定'] : ['chip--err', '尚未連線'],
+      desc:
+        env.line || env.telegram
+          ? `${env.line ? '已設定 LINE Channel Access Token。' : ''}${env.telegram ? '已設定 Telegram Bot Token 與 chat ID。' : ''}每日推播與提醒會送到已設定的每個通道。`
+          : '缺少 LINE_CHANNEL_ACCESS_TOKEN（或 Telegram 的 TELEGRAM_BOT_TOKEN 與 TELEGRAM_CHAT_ID），至少設定一個。設定完成前不會送出任何訊息，步驟見 README。',
+    },
     { title: '排程授權', done: env.cron, chip: env.cron ? ['chip--ok', '已設定'] : ['chip--err', '未設定'], desc: env.cron ? '排程 API 需帶 Authorization: Bearer CRON_SECRET。' : '缺少 CRON_SECRET（至少 16 字元），排程 API 會拒絕所有請求。' },
     { title: '第一筆每日快照', done: false, chip: ['chip--muted', '尚未執行'], desc: '' },
   ];
@@ -375,7 +383,7 @@ function FirstRun({ data }: { data: DashboardData }) {
                 <span className={`chip ${s.chip[0]}`}>{s.chip[1]}</span>
                 {i === steps.length - 1 ? (
                   <span className="steps__desc" style={{ display: 'flex', flexWrap: 'wrap', gap: 12, marginTop: 6 }}>
-                    <ActionButton action={runJobAction} fields={{ job: 'daily' }} label="立即執行一次每日排程" hint="會照常寫入快照；LINE 未連線時不會推播。" />
+                    <ActionButton action={runJobAction} fields={{ job: 'daily' }} label="立即執行一次每日排程" hint="會照常寫入快照；LINE、Telegram 都沒設定時不會推播。" />
                     {data.provider.isMock ? <ActionButton action={backfillAction} label="回填近 90 天（模擬資料）" hint="用 Mock Provider 產生標示為模擬的歷史資料。" /> : null}
                   </span>
                 ) : (

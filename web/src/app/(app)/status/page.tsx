@@ -4,12 +4,12 @@ import { backfillAction, retryEventAction, runJobAction } from '@/app/actions';
 import { ActionButton } from '@/components/action-button';
 import { PageHead } from '@/components/site-chrome';
 import { EventStatusChip, eventNote, JobStatusChip, jobLabel } from '@/components/status-chips';
-import { checkEnv, getEnv } from '@/lib/env';
-import { MAX_TOTAL_ATTEMPTS, RECOVERABLE_SKIPS, RETRY_WINDOW_MS } from '@/lib/jobs/notify';
+import { checkEnv, getEnv, parseTelegramChatIds } from '@/lib/env';
+import { canRetryEvent, MAX_TOTAL_ATTEMPTS } from '@/lib/jobs/notify';
 import { REFERENCE_CHART_URL } from '@/lib/line/messages';
 import { estimateMonthlyCalls, hasIntradayChecks } from '@/lib/schedule';
 import { getPageDeps } from '@/lib/server';
-import type { EventRow, JobType } from '@/lib/store/types';
+import type { JobType } from '@/lib/store/types';
 import { formatAge, formatTaipei, formatTaipeiTime } from '@/lib/time';
 import { loadDashboard } from '@/lib/view/dashboard';
 
@@ -18,11 +18,6 @@ export const dynamic = 'force-dynamic';
 
 const PLAN_LABEL: Record<string, string> = { light_free: '輕用量（免費）', medium: '中用量', high: '高用量', other: '其他方案' };
 const EVENT_LABEL = { daily: '每日行情', alert_up: '上漲提醒', alert_down: '下跌提醒', target: '到價提醒', test: '測試推播' } as const;
-
-function canRetry(e: EventRow, now: Date) {
-  const recoverable = e.status === 'failed' || (e.status === 'skipped' && e.skipReason !== null && RECOVERABLE_SKIPS.includes(e.skipReason));
-  return recoverable && e.attemptCount < MAX_TOTAL_ATTEMPTS && now.getTime() - e.createdAt.getTime() <= RETRY_WINDOW_MS;
-}
 
 export default async function StatusPage({ searchParams }: { searchParams: Promise<{ job?: string }> }) {
   const deps = await getPageDeps();
@@ -69,6 +64,8 @@ export default async function StatusPage({ searchParams }: { searchParams: Promi
           '更新頻率、呼叫次數上限與費用',
         ];
   const cap = quota.officialLimit ?? settings.monthlyMessageQuota;
+  const channels = [envStatus.line ? 'LINE' : '', envStatus.telegram ? 'Telegram' : ''].filter(Boolean);
+  const telegramChats = envStatus.telegram ? parseTelegramChatIds(env.TELEGRAM_CHAT_ID).length : 0;
 
   return (
     <>
@@ -111,10 +108,13 @@ export default async function StatusPage({ searchParams }: { searchParams: Promi
             </p>
           </section>
           <section className="card card--tight tile tint tint--pink" aria-labelledby="t4">
-            <h2 className="card-label" id="t4">LINE 推播</h2>
-            <p className="tile__value">{envStatus.line ? '已設定' : '尚未連線'}</p>
+            <h2 className="card-label" id="t4">{envStatus.telegram ? '推播' : 'LINE 推播'}</h2>
+            <p className="tile__value">{envStatus.telegram ? channels.join('＋') : envStatus.line ? '已設定' : '尚未連線'}</p>
             <div className="tile__chips">
-              <span className={`chip ${quota.pausedReason ? 'chip--warn' : 'chip--ok'}`}><span className="dot" />{quota.pausedReason ? '推播暫停' : '推播未暫停'}</span>
+              {envStatus.line || !envStatus.telegram ? (
+                <span className={`chip ${quota.pausedReason ? 'chip--warn' : 'chip--ok'}`}><span className="dot" />{envStatus.telegram ? 'LINE ' : ''}{quota.pausedReason ? '推播暫停' : '推播未暫停'}</span>
+              ) : null}
+              {envStatus.telegram ? <span className="chip chip--ok"><span className="dot" />Telegram {telegramChats} 個聊天室</span> : null}
             </div>
             <p className="small soft">{data.lastPush ? `最近推播 ${formatTaipei(data.lastPush.sentAt ?? data.lastPush.updatedAt).slice(5)}` : '還沒有推播紀錄'}</p>
           </section>
@@ -265,6 +265,9 @@ export default async function StatusPage({ searchParams }: { searchParams: Promi
               </thead>
               <tbody>
                 <tr><td className="tbl__title">LINE 官方帳號</td><td data-label="用途">每日推播、異動提醒</td><td data-label="方案">{PLAN_LABEL[settings.linePlan] ?? settings.linePlan}</td><td data-label="費用">{settings.linePlan === 'light_free' ? 'NT$0（每月 200 則，用完無法加購）' : '依 LINE 當期價格'}</td><td className="soft" data-label="備註">2026/11/1 起：中用量 NT$1,000／月（3,000 則）、高用量 NT$1,400／月（6,000 則，可加購）；未稅</td></tr>
+                {envStatus.telegram ? (
+                  <tr><td className="tbl__title">Telegram Bot</td><td data-label="用途">每日推播、異動提醒</td><td data-label="方案">Bot API</td><td data-label="費用">免費</td><td className="soft" data-label="備註">不限則數，不占 LINE 額度；每個聊天室各送一次</td></tr>
+                ) : null}
                 <tr><td className="tbl__title">Supabase</td><td data-label="用途">資料庫、排程（pg_cron）</td><td className="soft" data-label="方案">{envStatus.supabase ? '[請填入方案]' : '尚未設定'}</td><td className="soft" data-label="費用">[待確認]</td><td className="soft" data-label="備註">免費方案 7 天沒有活動會暫停；每 15 分鐘的排程呼叫可維持活動</td></tr>
                 <tr><td className="tbl__title">Vercel</td><td data-label="用途">網站、每日排程備援</td><td className="soft" data-label="方案">[請填入方案]</td><td className="soft" data-label="費用">[待確認]</td><td className="soft" data-label="備註">Hobby 的 Cron 一天一次、只精確到小時；Pro 為 US$20／月</td></tr>
                 <tr>
@@ -370,14 +373,17 @@ export default async function StatusPage({ searchParams }: { searchParams: Promi
                       <td className="num small" data-label="事件鍵">{e.idempotencyKey.length > 40 ? `${e.idempotencyKey.slice(0, 40)}…` : e.idempotencyKey}</td>
                       <td className="num r" data-label="嘗試次數">{e.attemptCount}</td>
                       <td data-label="狀態"><EventStatusChip event={e} /><span className="cell-note">{eventNote(e)}</span></td>
-                      <td data-label="操作">{canRetry(e, now) ? <ActionButton action={retryEventAction} fields={{ eventId: String(e.id) }} label="重試" variant="small" /> : <span className="small soft">—</span>}</td>
+                      <td data-label="操作">{canRetryEvent(e, now) ? <ActionButton action={retryEventAction} fields={{ eventId: String(e.id) }} label="重試" variant="small" /> : <span className="small soft">—</span>}</td>
                     </tr>
                   ))}
                 </tbody>
               </table>
             </div>
           )}
-          <p className="caption">重試會沿用原本的 LINE retry key（24 小時內有效），已送達的訊息不會重複送出；每則事件最多嘗試 {MAX_TOTAL_ATTEMPTS} 次。</p>
+          <p className="caption">
+            重試會沿用原本的 LINE retry key（24 小時內有效），已送達的訊息不會重複送出；每則事件最多嘗試 {MAX_TOTAL_ATTEMPTS} 次。
+            {envStatus.telegram ? ' Telegram 沒有 retry key：重試只送給還沒收到的聊天室；只有逾時（不確定是否送達）後重試時，可能多收到一則。' : null}
+          </p>
         </section>
       </main>
     </>

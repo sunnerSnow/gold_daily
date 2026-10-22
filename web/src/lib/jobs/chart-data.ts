@@ -3,6 +3,8 @@ import { computeChange } from '../gold/math';
 import { buildDailyCard, type FlexMessage } from '../line/flex';
 import { formatDailyMessage, type DailyMessageInput } from '../line/messages';
 import type { InstrumentKey, SnapshotRow } from '../store/types';
+import type { TelegramMessage } from '../telegram/client';
+import { buildDailyTelegram } from '../telegram/format';
 import type { JobDeps } from './deps';
 
 // 走勢圖、每日卡片與每日訊息預覽用的資料。只讀資料庫裡的每日快照，不呼叫行情來源。
@@ -68,14 +70,26 @@ export async function dailyMessageInput(deps: JobDeps, date: string): Promise<{ 
   };
 }
 
-/** 某天的每日卡片（含精簡版走勢圖）；那天沒有每日快照時回傳 null，由呼叫端改送純文字 */
-export async function dailyCard(deps: JobDeps, date: string): Promise<{ card: FlexMessage; withChart: boolean } | null> {
+/** 每日推播的 LINE 卡片與 Telegram 訊息：同一組資料、同一張走勢圖 */
+export interface DailyMessages {
+  card: FlexMessage;
+  telegram: TelegramMessage;
+  withChart: boolean;
+}
+
+/** 資料無效時回傳 null，由呼叫端改送純文字 */
+export function buildDailyMessages(input: DailyMessageInput, chartUrl: string | null): DailyMessages | null {
+  const card = buildDailyCard(input, chartUrl);
+  const telegram = buildDailyTelegram(input, chartUrl);
+  return card && telegram ? { card, telegram, withChart: chartUrl !== null } : null;
+}
+
+/** 某天的每日卡片與 Telegram 訊息（含精簡版走勢圖）；那天沒有每日快照時回傳 null，由呼叫端改送純文字 */
+export async function dailyMessages(deps: JobDeps, date: string): Promise<DailyMessages | null> {
   try {
     const data = await dailyMessageInput(deps, date);
     if (!data) return null;
-    const chartUrl = await dailyChartUrl(deps, date);
-    const card = buildDailyCard(data.input, chartUrl);
-    return card ? { card, withChart: chartUrl !== null } : null;
+    return buildDailyMessages(data.input, await dailyChartUrl(deps, date));
   } catch {
     return null;
   }

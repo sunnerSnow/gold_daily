@@ -31,7 +31,7 @@ describe('排程 API 路由', () => {
   afterEach(() => vi.unstubAllEnvs());
   // 就算開發者的環境有真的金鑰，測試也絕不連到真的 LINE 或 Supabase
   beforeEach(() => {
-    for (const key of ['LINE_CHANNEL_ACCESS_TOKEN', 'LINE_USER_ID', 'SUPABASE_URL', 'SUPABASE_SERVICE_ROLE_KEY']) vi.stubEnv(key, '');
+    for (const key of ['LINE_CHANNEL_ACCESS_TOKEN', 'LINE_USER_ID', 'TELEGRAM_BOT_TOKEN', 'TELEGRAM_CHAT_ID', 'SUPABASE_URL', 'SUPABASE_SERVICE_ROLE_KEY']) vi.stubEnv(key, '');
   });
 
   it('未授權的請求回 401，且不執行排程', async () => {
@@ -63,7 +63,7 @@ describe('LINE webhook 路由', () => {
   afterEach(() => vi.unstubAllEnvs());
   beforeEach(() => {
     // 不給 access token：就算簽章正確也不會呼叫真的 LINE 回覆
-    for (const key of ['LINE_CHANNEL_ACCESS_TOKEN', 'LINE_USER_ID', 'SUPABASE_URL', 'SUPABASE_SERVICE_ROLE_KEY']) vi.stubEnv(key, '');
+    for (const key of ['LINE_CHANNEL_ACCESS_TOKEN', 'LINE_USER_ID', 'TELEGRAM_BOT_TOKEN', 'TELEGRAM_CHAT_ID', 'SUPABASE_URL', 'SUPABASE_SERVICE_ROLE_KEY']) vi.stubEnv(key, '');
   });
   const post = async (body: string, signature?: string) => {
     vi.resetModules();
@@ -180,6 +180,35 @@ describe('環境變數檢查', () => {
   it('檢查結果不包含秘密的值', () => {
     const s = checkEnv(readEnv({ LINE_CHANNEL_ACCESS_TOKEN: 'super-secret-token', CRON_SECRET: 'short' }));
     expect(JSON.stringify(s)).not.toContain('super-secret-token');
+  });
+
+  it('Telegram 是選用的：沒設定不算問題；token 與 chat ID 都有才算已設定', async () => {
+    const { parseTelegramChatIds } = await import('../env');
+    expect(parseTelegramChatIds('123456789, -1001234567890，@gold_daily,123456789')).toEqual(['123456789', '-1001234567890', '@gold_daily']);
+    const none = checkEnv(readEnv({ LINE_CHANNEL_ACCESS_TOKEN: 'token' }));
+    expect(none.telegram).toBe(false);
+    expect(none.issues.some((i) => i.key.startsWith('TELEGRAM_'))).toBe(false);
+    const ok = checkEnv(readEnv({ TELEGRAM_BOT_TOKEN: '123456:secret-AAH_x', TELEGRAM_CHAT_ID: '-1001234567890,@gold_daily' }));
+    expect(ok.telegram).toBe(true);
+    expect(JSON.stringify(ok)).not.toContain('secret-AAH_x');
+  });
+
+  it('Telegram 只設一半或格式錯時提示，並視為未連線', () => {
+    const noChat = checkEnv(readEnv({ TELEGRAM_BOT_TOKEN: '123456:abc' }));
+    expect(noChat.telegram).toBe(false);
+    expect(noChat.issues.some((i) => i.key === 'TELEGRAM_CHAT_ID')).toBe(true);
+    expect(checkEnv(readEnv({ TELEGRAM_CHAT_ID: '123' })).issues.some((i) => i.key === 'TELEGRAM_BOT_TOKEN')).toBe(true);
+    const badToken = checkEnv(readEnv({ TELEGRAM_BOT_TOKEN: 'not-a-token', TELEGRAM_CHAT_ID: '123' }));
+    expect(badToken.telegram).toBe(false);
+    const badChat = checkEnv(readEnv({ TELEGRAM_BOT_TOKEN: '123456:abc', TELEGRAM_CHAT_ID: '123,gold channel' }));
+    expect(badChat.telegram).toBe(false);
+    expect(badChat.issues.find((i) => i.key === 'TELEGRAM_CHAT_ID')?.message).toContain('第 2、3 個');
+  });
+
+  it('只用 Telegram 時，沒設定 LINE 不算問題', () => {
+    const s = checkEnv(readEnv({ TELEGRAM_BOT_TOKEN: '123456:abc', TELEGRAM_CHAT_ID: '123' }));
+    expect(s).toMatchObject({ line: false, telegram: true });
+    expect(s.issues.some((i) => i.key === 'LINE_CHANNEL_ACCESS_TOKEN')).toBe(false);
   });
 });
 

@@ -68,13 +68,15 @@ export async function loadDashboard(deps: JobDeps): Promise<DashboardData> {
   const from = taipeiDate(new Date(now.getTime() - 90 * 86_400_000));
 
   // 第一批：彼此獨立的查詢一起送出（資料庫在遠端時，逐一查詢會很慢）
-  const [settings, latest, historyRows, lastDailyRun, lastIntradayRun, lastPush, alerts, latestSync, localSent, allTargets, recipientCount] = await Promise.all([
+  const [settings, latest, historyRows, lastDailyRun, lastIntradayRun, lastLinePush, lastTelegramPush, alerts, latestSync, localSent, allTargets, recipientCount] = await Promise.all([
     store.getSettings(),
     instrument ? store.getLatestSnapshot(instrument) : Promise.resolve(null),
     instrument ? store.listDailySnapshots({ instrument, from }).then((r) => r.rows) : Promise.resolve([]),
     store.getLastJobRun('daily'),
     store.getLastJobRun('intraday'),
     store.getLastEvent(['daily', 'alert_up', 'alert_down', 'target', 'test'], ['sent', 'failed', 'sending']),
+    // 只用 Telegram 時 LINE 那一邊都是「未發送」，最近一次推播要另外從 Telegram 的狀態找
+    deps.telegram.configured ? store.listEvents({ limit: 20 }).then((rows) => rows.find((e) => e.telegramStatus !== null) ?? null) : Promise.resolve(null),
     store.listEvents({ types: ['alert_up', 'alert_down', 'target'], limit: 5 }),
     store.getLatestQuotaSync({ successOnly: true }),
     store.countSentSince(startOfLineBillingMonth(now)),
@@ -82,6 +84,9 @@ export async function loadDashboard(deps: JobDeps): Promise<DashboardData> {
     deps.line.getRecipientCount(),
   ]);
   const recipients = Math.max(1, recipientCount);
+  const lastPush = [lastLinePush, lastTelegramPush]
+    .filter((e): e is EventRow => e !== null)
+    .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime() || b.id - a.id)[0] ?? null;
 
   // 第二批：需要第一批結果的查詢
   // 依查價時間表判斷：兩次查價之間沿用上一次的報價是正常的，只有來源沒更新或排程漏查才算過期

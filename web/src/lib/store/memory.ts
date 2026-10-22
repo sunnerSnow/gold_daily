@@ -34,6 +34,9 @@ import {
 const sameKey = (a: InstrumentKey, b: InstrumentKey) =>
   a.source === b.source && a.symbol === b.symbol && a.currency === b.currency && a.unit === b.unit;
 
+/** 事件裡有陣列（telegramSentTo），回傳時要連陣列一起複製，呼叫端改了也不會動到存的資料 */
+const copyEvent = (e: EventRow): EventRow => ({ ...e, telegramSentTo: [...e.telegramSentTo] });
+
 export class MemoryStore implements Store {
   readonly kind = 'memory' as const;
   private snapshots: SnapshotRow[] = [];
@@ -130,7 +133,7 @@ export class MemoryStore implements Store {
 
   async insertEvent(input: NewEvent) {
     const existing = this.events.find((e) => e.idempotencyKey === input.idempotencyKey);
-    if (existing) return { event: { ...existing }, created: false };
+    if (existing) return { event: copyEvent(existing), created: false };
     const t = this.now();
     const row: EventRow = {
       id: ++this.seq.event,
@@ -149,28 +152,34 @@ export class MemoryStore implements Store {
       attemptCount: 0,
       lastError: null,
       sentAt: null,
+      telegramStatus: null,
+      telegramSentTo: [],
+      telegramAttemptCount: 0,
+      telegramLastError: null,
+      telegramSentAt: null,
       createdAt: t,
       updatedAt: t,
     };
     this.events.push(row);
-    return { event: { ...row }, created: true };
+    return { event: copyEvent(row), created: true };
   }
 
   async updateEvent(id: number, patch: EventPatch) {
     const row = this.events.find((e) => e.id === id);
     if (!row) throw new Error(`event ${id} not found`);
     Object.assign(row, patch, { updatedAt: this.now() });
-    return { ...row };
+    if (patch.telegramSentTo) row.telegramSentTo = [...patch.telegramSentTo];
+    return copyEvent(row);
   }
 
   async getEvent(id: number) {
     const row = this.events.find((e) => e.id === id);
-    return row ? { ...row } : null;
+    return row ? copyEvent(row) : null;
   }
 
   async getEventByKey(idempotencyKey: string) {
     const row = this.events.find((e) => e.idempotencyKey === idempotencyKey);
-    return row ? { ...row } : null;
+    return row ? copyEvent(row) : null;
   }
 
   async getLastEvent(types: EventType[], statuses: EventStatus[], since?: Date) {
@@ -178,7 +187,7 @@ export class MemoryStore implements Store {
       .filter((e) => types.includes(e.eventType) && statuses.includes(e.status))
       .filter((e) => !since || e.createdAt >= since)
       .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime() || b.id - a.id);
-    return rows[0] ? { ...rows[0] } : null;
+    return rows[0] ? copyEvent(rows[0]) : null;
   }
 
   async listEvents(options: { types?: EventType[]; limit: number }) {
@@ -186,7 +195,7 @@ export class MemoryStore implements Store {
       .filter((e) => !options.types || options.types.includes(e.eventType))
       .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime() || b.id - a.id)
       .slice(0, options.limit)
-      .map((e) => ({ ...e }));
+      .map(copyEvent);
   }
 
   async countSentSince(since: Date) {

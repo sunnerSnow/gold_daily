@@ -2,9 +2,10 @@ import { MockGoldPriceProvider, type MockScenario } from '../gold/mock-provider'
 import type { LineClient, LineMessage, LineQuota, PushResult } from '../line/client';
 import type { FlexMessage } from '../line/flex';
 import { MemoryStore } from '../store/memory';
+import type { TelegramClient, TelegramMessage, TelegramResult } from '../telegram/client';
 import type { JobDeps } from './deps';
 
-// 測試用的假 LINE 與可控制的時鐘。測試絕不呼叫真的 LINE 或行情來源。
+// 測試用的假 LINE、假 Telegram 與可控制的時鐘。測試絕不呼叫真的 LINE、Telegram 或行情來源。
 
 export interface FakePush {
   messages: LineMessage[];
@@ -68,6 +69,38 @@ export class FakeLine implements LineClient {
   }
 }
 
+export class FakeTelegram implements TelegramClient {
+  /** 預設沒設定（既有測試只看 LINE）；測 Telegram 時設成 true */
+  configured = false;
+  chatIds: string[] = ['1001'];
+  /** 每一次呼叫（含失敗的）與結果 */
+  sends: { chatId: string; message: TelegramMessage; ok: boolean }[] = [];
+  /** 依序回傳的結果；用完後一律成功 */
+  script: TelegramResult[] = [];
+  /** 某些聊天室一律失敗（例如封鎖了 bot） */
+  failingChats = new Map<string, TelegramResult>();
+  /** 模擬 Telegram 抓不到走勢圖（回 400） */
+  rejectPhotos = false;
+
+  async send(chatId: string, message: TelegramMessage): Promise<TelegramResult> {
+    const result = this.respond(chatId, message);
+    this.sends.push({ chatId, message, ok: result.ok });
+    return result;
+  }
+
+  private respond(chatId: string, message: TelegramMessage): TelegramResult {
+    if (this.rejectPhotos && message.type === 'photo') {
+      return { ok: false, status: 400, retryable: false, error: 'Telegram API 400：Bad Request: failed to get HTTP URL content' };
+    }
+    return this.failingChats.get(chatId) ?? this.script.shift() ?? { ok: true };
+  }
+
+  /** 某個聊天室實際收到的訊息（不含失敗的） */
+  received(chatId: string): TelegramMessage[] {
+    return this.sends.filter((s) => s.chatId === chatId && s.ok).map((s) => s.message);
+  }
+}
+
 export class Clock {
   constructor(public current: Date) {}
   now = () => new Date(this.current);
@@ -105,6 +138,7 @@ export class LimitedMockProvider extends MockGoldPriceProvider {
 export interface TestWorld {
   store: MemoryStore;
   line: FakeLine;
+  telegram: FakeTelegram;
   clock: Clock;
   deps(scenario?: MockScenario): JobDeps;
 }
@@ -113,16 +147,19 @@ export function createWorld(startIso: string): TestWorld {
   const clock = new Clock(new Date(startIso));
   const store = new MemoryStore(clock.now);
   const line = new FakeLine();
+  const telegram = new FakeTelegram();
   let id = 0;
   return {
     store,
     line,
+    telegram,
     clock,
     deps(scenario: MockScenario = 'normal') {
       return {
         store,
         provider: new MockGoldPriceProvider({ scenario, now: clock.now }),
         line,
+        telegram,
         now: clock.now,
         sleep: async () => {},
         newId: () => `00000000-0000-0000-0000-${String(++id).padStart(12, '0')}`,

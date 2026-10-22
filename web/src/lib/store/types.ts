@@ -59,7 +59,10 @@ export interface SettingsRow {
 export type SettingsPatch = Partial<Omit<SettingsRow, 'createdAt' | 'updatedAt' | 'timezone'>>;
 
 export type EventType = 'daily' | 'alert_up' | 'alert_down' | 'target' | 'test';
+/** LINE 的發送狀態（status 欄位；額度、冷卻等略過原因都記在這裡） */
 export type EventStatus = 'pending' | 'sending' | 'sent' | 'failed' | 'skipped';
+/** Telegram 的發送狀態；沒設定 Telegram 時不送，維持 null */
+export type TelegramStatus = 'sending' | 'sent' | 'failed';
 
 export type SkipReason =
   | 'line_not_configured'
@@ -85,6 +88,14 @@ export interface EventRow {
   attemptCount: number;
   lastError: string | null;
   sentAt: Date | null;
+  /** null＝沒有送 Telegram（尚未設定，或這則事件不用發送，例如冷卻中） */
+  telegramStatus: TelegramStatus | null;
+  /** 已送達的 chat ID。Telegram 沒有 retry key，重試時跳過這些聊天室才不會重複 */
+  telegramSentTo: string[];
+  telegramAttemptCount: number;
+  /** 失敗原因；送出後若走勢圖被拒、改送文字，也記在這裡 */
+  telegramLastError: string | null;
+  telegramSentAt: Date | null;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -105,7 +116,22 @@ export type NewEvent = Pick<EventRow, 'eventType' | 'idempotencyKey'> &
     >
   >;
 
-export type EventPatch = Partial<Pick<EventRow, 'status' | 'skipReason' | 'attemptCount' | 'lastError' | 'sentAt' | 'messageText'>>;
+export type EventPatch = Partial<
+  Pick<
+    EventRow,
+    | 'status'
+    | 'skipReason'
+    | 'attemptCount'
+    | 'lastError'
+    | 'sentAt'
+    | 'messageText'
+    | 'telegramStatus'
+    | 'telegramSentTo'
+    | 'telegramAttemptCount'
+    | 'telegramLastError'
+    | 'telegramSentAt'
+  >
+>;
 
 export type JobType = 'daily' | 'intraday' | 'quota_sync';
 export type JobTrigger = 'cron' | 'manual';
