@@ -1,0 +1,428 @@
+<!doctype html>
+<html lang="zh-Hant-TW">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Gold Daily 推廣圖</title>
+<!-- 風格參考 nsl-jp.com：芥末黃底＋紙張顆粒、奶油色書頁、扁平手繪小人、明朝體與斜體襯線字。
+     用 render.sh 輸出 PNG；不帶 ?board= 參數時，所有圖排在同一頁方便預覽。 -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@1,600;1,700&family=Noto+Serif+TC:wght@500;700;900&display=swap">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js"></script>
+<style>
+  :root {
+    --mustard: #E9AE40;
+    --mustard-d: #D39A2E;
+    --mustard-l: #F2C66B;
+    --cream: #F3E9D9;
+    --paper: #FFFDF8;
+    --beige: #DCD5C9;
+    --ink: #231815;
+    --ink-2: #5E4F3C;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; }
+  body { background: #8B8478; font-family: 'Noto Serif TC', 'Songti TC', 'PMingLiU', serif; color: var(--ink); }
+  body.single { background: transparent; }
+  body.gallery { display: flex; flex-wrap: wrap; gap: 40px; padding: 40px; align-items: flex-start; }
+  .board { position: relative; overflow: hidden; background: var(--mustard); display: none; flex: none; }
+  body.gallery .board, .board.on { display: block; }
+  .board.clear { background: transparent; }
+  body.gallery .board.clear { background: repeating-conic-gradient(#ddd 0 25%, #fff 0 50%) 0 0 / 24px 24px; }
+  .art { position: absolute; inset: 0; display: block; }
+  .en { font-family: 'Cormorant Garamond', 'Times New Roman', serif; font-style: italic; font-weight: 700; letter-spacing: 0.02em; }
+  .h { position: absolute; margin: 0; font-weight: 900; line-height: 1.2; letter-spacing: 0.06em; }
+  .h .mark { background: linear-gradient(transparent 64%, var(--paper) 64%, var(--paper) 90%, transparent 90%); }
+  .sub { position: absolute; margin: 0; font-weight: 700; line-height: 1.6; letter-spacing: 0.04em; }
+  .note { position: absolute; margin: 0; font-weight: 500; color: var(--ink-2); letter-spacing: 0.04em; }
+  .more { display: flex; align-items: flex-end; gap: 10px; color: var(--ink); }
+  .cta { position: absolute; display: flex; flex-direction: column; gap: 16px; }
+  .cta-row { display: flex; align-items: center; gap: 20px; }
+  .cta-text { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+  .cta-text .label { font-weight: 700; color: var(--ink-2); }
+  .cta-text .bot { font-weight: 900; word-break: break-all; }
+  .qr { flex: none; display: flex; align-items: center; justify-content: center; background: var(--paper); border-radius: 14px; }
+  .qr svg { display: block; width: 100%; height: 100%; }
+  .qr.empty { border: 2px dashed #9C8B77; color: var(--ink-2); font-size: 15px; font-weight: 700; text-align: center; line-height: 1.5; white-space: nowrap; }
+</style>
+</head>
+<body>
+
+<!-- 共用圖形：金條、金幣、小人、手機、漲跌記號、logo，以及紙張顆粒與手繪毛邊濾鏡 -->
+<svg aria-hidden="true" style="position: absolute; width: 0; height: 0">
+  <defs>
+    <filter id="rough" x="-10%" y="-10%" width="120%" height="120%">
+      <feTurbulence type="fractalNoise" baseFrequency="0.035" numOctaves="2" seed="3" result="n"></feTurbulence>
+      <feDisplacementMap in="SourceGraphic" in2="n" scale="4" xChannelSelector="R" yChannelSelector="G"></feDisplacementMap>
+    </filter>
+    <filter id="soft"><feGaussianBlur stdDeviation="0.9"></feGaussianBlur></filter>
+    <filter id="grain-dark" x="0" y="0" width="100%" height="100%">
+      <feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="2" seed="4" stitchTiles="stitch"></feTurbulence>
+      <feColorMatrix values="0 0 0 0 0.42  0 0 0 0 0.27  0 0 0 0 0.08  2.4 0 0 0 -1.32"></feColorMatrix>
+    </filter>
+    <filter id="grain-light" x="0" y="0" width="100%" height="100%">
+      <feTurbulence type="fractalNoise" baseFrequency="0.7" numOctaves="2" seed="11" stitchTiles="stitch"></feTurbulence>
+      <feColorMatrix values="0 0 0 0 1  0 0 0 0 0.98  0 0 0 0 0.92  2.4 0 0 0 -1.38"></feColorMatrix>
+    </filter>
+    <filter id="mottle" x="0" y="0" width="100%" height="100%">
+      <feTurbulence type="fractalNoise" baseFrequency="0.012" numOctaves="3" seed="2"></feTurbulence>
+      <feColorMatrix values="0 0 0 0 0.78  0 0 0 0 0.52  0 0 0 0 0.12  0 0 0 1.3 -0.6"></feColorMatrix>
+    </filter>
+
+    <!-- 等角金條：O 在最上方的後角 -->
+    <g id="bar">
+      <polygon points="103.9,60 55.4,88 55.4,46 90.1,26" fill="#D9A13A" stroke="#B07A1E" stroke-width="1.5" stroke-linejoin="round"></polygon>
+      <polygon points="-48.5,28 55.4,88 55.4,46 -34.7,-6" fill="#F2C66B" stroke="#B07A1E" stroke-width="1.5" stroke-linejoin="round"></polygon>
+      <polygon points="0,-26 90.1,26 55.4,46 -34.7,-6" fill="#FBE3A2" stroke="#B07A1E" stroke-width="1.5" stroke-linejoin="round"></polygon>
+      <path d="M4 -5 L52 22" stroke="#FFF6DC" stroke-width="5" stroke-linecap="round"></path>
+    </g>
+
+    <g id="coin">
+      <ellipse cx="0" cy="6" rx="28" ry="15" fill="#C98F27"></ellipse>
+      <ellipse cx="0" cy="0" rx="28" ry="15" fill="#E9AE40"></ellipse>
+      <ellipse cx="0" cy="0" rx="9" ry="5" fill="#FFFDF8"></ellipse>
+    </g>
+    <g id="coin-light">
+      <ellipse cx="0" cy="6" rx="28" ry="15" fill="#DCD5C9"></ellipse>
+      <ellipse cx="0" cy="0" rx="28" ry="15" fill="#FFFDF8"></ellipse>
+      <ellipse cx="0" cy="0" rx="9" ry="5" fill="#E9AE40"></ellipse>
+    </g>
+
+    <!-- 小人 A：芥末色毛衣、白褲子，右手往前指（腳底中心在 0,0） -->
+    <g id="person-a">
+      <ellipse cx="0" cy="2" rx="46" ry="12" fill="#DCD5C9"></ellipse>
+      <ellipse cx="-13" cy="-4" rx="14" ry="8" fill="#231815"></ellipse>
+      <ellipse cx="13" cy="-4" rx="14" ry="8" fill="#231815"></ellipse>
+      <path d="M-23 -10 L-24 -66 L24 -66 L23 -10 Q22 -6 16 -6 L4 -6 L1 -42 L-1 -42 L-4 -6 L-16 -6 Q-22 -6 -23 -10 Z" fill="#FFFFFF" stroke="#E3B866" stroke-width="2" stroke-linejoin="round"></path>
+      <path d="M-27 -108 Q-42 -88 -36 -70" fill="none" stroke="#E9AE40" stroke-width="16" stroke-linecap="round"></path>
+      <circle cx="-36" cy="-64" r="8" fill="#F7D7A1"></circle>
+      <path d="M-31 -60 Q-35 -110 -16 -118 L16 -118 Q35 -110 31 -60 Q0 -54 -31 -60 Z" fill="#E9AE40"></path>
+      <path d="M26 -108 Q50 -104 68 -98" fill="none" stroke="#E9AE40" stroke-width="16" stroke-linecap="round"></path>
+      <circle cx="74" cy="-97" r="8" fill="#F7D7A1"></circle>
+      <rect x="-6" y="-128" width="12" height="12" fill="#F7D7A1"></rect>
+      <circle cx="0" cy="-143" r="21" fill="#F7D7A1"></circle>
+      <path d="M-23 -140 Q-25 -168 0 -167 Q25 -168 23 -140 L23 -127 Q19 -122 15 -127 L15 -147 Q0 -152 -15 -147 L-15 -127 Q-19 -122 -23 -127 Z" fill="#231815"></path>
+    </g>
+
+    <!-- 小人 B：白毛衣、芥末色褲子，雙手把金條舉過頭 -->
+    <g id="person-b">
+      <ellipse cx="0" cy="2" rx="46" ry="12" fill="#DCD5C9"></ellipse>
+      <ellipse cx="-13" cy="-4" rx="14" ry="8" fill="#231815"></ellipse>
+      <ellipse cx="13" cy="-4" rx="14" ry="8" fill="#231815"></ellipse>
+      <path d="M-23 -10 L-24 -66 L24 -66 L23 -10 Q22 -6 16 -6 L4 -6 L1 -42 L-1 -42 L-4 -6 L-16 -6 Q-22 -6 -23 -10 Z" fill="#D39A2E"></path>
+      <path d="M-25 -106 Q-36 -146 -24 -178" fill="none" stroke="#E3B866" stroke-width="19" stroke-linecap="round"></path>
+      <path d="M25 -106 Q36 -146 24 -178" fill="none" stroke="#E3B866" stroke-width="19" stroke-linecap="round"></path>
+      <path d="M-25 -106 Q-36 -146 -24 -178" fill="none" stroke="#FFFFFF" stroke-width="15" stroke-linecap="round"></path>
+      <path d="M25 -106 Q36 -146 24 -178" fill="none" stroke="#FFFFFF" stroke-width="15" stroke-linecap="round"></path>
+      <path d="M-31 -60 Q-35 -110 -16 -118 L16 -118 Q35 -110 31 -60 Q0 -54 -31 -60 Z" fill="#FFFFFF" stroke="#E3B866" stroke-width="2" stroke-linejoin="round"></path>
+      <rect x="-6" y="-128" width="12" height="12" fill="#F7D7A1"></rect>
+      <circle cx="0" cy="-143" r="21" fill="#F7D7A1"></circle>
+      <circle cx="0" cy="-170" r="10" fill="#231815"></circle>
+      <path d="M-22 -140 Q-24 -166 0 -165 Q24 -166 22 -140 Q12 -150 0 -150 Q-12 -150 -22 -140 Z" fill="#231815"></path>
+      <use href="#bar" transform="translate(-15.2 -236) scale(0.55)"></use>
+      <circle cx="-24" cy="-182" r="8" fill="#F7D7A1"></circle>
+      <circle cx="24" cy="-182" r="8" fill="#F7D7A1"></circle>
+    </g>
+
+    <!-- 平躺的手機（本地座標 340×640，外面再套等角變形）：螢幕上是一則每日行情，文字在上、走勢圖在下、按鈕 -->
+    <g id="phone">
+      <rect width="340" height="640" rx="44" fill="#231815"></rect>
+      <rect x="16" y="16" width="308" height="608" rx="32" fill="#FFFDF8"></rect>
+      <rect x="140" y="30" width="60" height="10" rx="5" fill="#231815"></rect>
+      <rect x="38" y="70" width="264" height="420" rx="22" fill="#F3E9D9"></rect>
+      <rect x="58" y="94" width="140" height="16" rx="8" fill="#231815"></rect>
+      <rect x="58" y="124" width="196" height="9" rx="4.5" fill="#C9BFAF"></rect>
+      <rect x="58" y="141" width="150" height="9" rx="4.5" fill="#C9BFAF"></rect>
+      <rect x="58" y="164" width="172" height="26" rx="8" fill="#E9AE40"></rect>
+      <path d="M58 220 L68 204 L78 220 Z" fill="#231815"></path>
+      <rect x="86" y="208" width="92" height="10" rx="5" fill="#C98F27"></rect>
+      <rect x="58" y="238" width="224" height="150" rx="12" fill="#FFFDF8"></rect>
+      <path d="M70 362 L98 348 L124 354 L150 322 L176 332 L204 298 L230 306 L266 266 L266 378 L70 378 Z" fill="#F2C66B" fill-opacity="0.6"></path>
+      <polyline points="70,362 98,348 124,354 150,322 176,332 204,298 230,306 266,266" fill="none" stroke="#D39A2E" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"></polyline>
+      <circle cx="266" cy="266" r="8" fill="#231815"></circle>
+      <rect x="58" y="404" width="224" height="44" rx="22" fill="#E9AE40"></rect>
+      <rect x="122" y="421" width="96" height="10" rx="5" fill="#231815"></rect>
+      <rect x="130" y="596" width="80" height="7" rx="3.5" fill="#C9BFAF"></rect>
+    </g>
+
+    <!-- 漂浮記號：取代參考網站的音符，改成漲跌與走勢 -->
+    <g id="mark-up" fill="#231815">
+      <circle cx="0" cy="40" r="10"></circle>
+      <path d="M18 52 L46 -2" stroke="#231815" stroke-width="5" stroke-linecap="round" opacity="0.8"></path>
+      <path d="M58 30 L80 -10 L102 30 Z"></path>
+    </g>
+    <g id="mark-zig" fill="none" stroke="#231815" stroke-width="7" stroke-linecap="round" stroke-linejoin="round">
+      <polyline points="0,40 22,18 40,30 70,-4"></polyline>
+      <polyline points="52,-4 70,-4 70,14"></polyline>
+    </g>
+
+    <!-- logo：圓頭粗筆畫 GOLD（O 是一枚金幣）＋斜體 daily＋「每日金價」（370×215） -->
+    <g id="logo">
+      <g fill="none" stroke="#231815" stroke-width="26" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M76.2 23.8 A37 37 0 1 0 87 50 L60 50"></path>
+        <path d="M226 13 V87 H272"></path>
+        <path d="M304 13 V87 H320 A37 37 0 0 0 320 13 Z"></path>
+      </g>
+      <circle cx="158" cy="50" r="40" fill="#FFFDF8" stroke="#231815" stroke-width="12"></circle>
+      <circle cx="158" cy="50" r="12" fill="#231815"></circle>
+      <text x="370" y="160" text-anchor="end" font-family="'Cormorant Garamond', serif" font-style="italic" font-weight="700" font-size="74" fill="#231815">daily</text>
+      <rect x="14" y="196" width="100" height="3" fill="#231815"></rect>
+      <rect x="256" y="196" width="100" height="3" fill="#231815"></rect>
+      <text x="190" y="206" text-anchor="middle" font-family="'Noto Serif TC', serif" font-weight="700" font-size="24" letter-spacing="10" fill="#231815">每日金價</text>
+    </g>
+
+    <!-- 「VIEW MORE」式的手繪線＋筆尖 -->
+    <g id="pen-line">
+      <path d="M2 24 Q 70 20 130 23 T 236 21" fill="none" stroke="#231815" stroke-width="2.2" stroke-linecap="round"></path>
+      <path d="M226 30 L246 4 Q250 1 249 7 L233 32 Z" fill="none" stroke="#231815" stroke-width="2" stroke-linejoin="round"></path>
+      <path d="M233 32 L229 38" stroke="#231815" stroke-width="2" stroke-linecap="round"></path>
+    </g>
+  </defs>
+</svg>
+
+<!-- ============ 方形貼文 1080×1080：金金計較，天天報到 ============ -->
+<section id="square" class="board" style="width: 1080px; height: 1080px">
+  <svg class="art" width="1080" height="1080" viewBox="0 0 1080 1080" aria-hidden="true">
+    <rect width="1080" height="1080" filter="url(#mottle)" opacity="0.35"></rect>
+    <g filter="url(#rough)">
+      <path d="M-60 580 L0 572 C 200 522, 380 582, 560 542 S 900 482, 1080 527 L1140 520 L1140 1140 L-60 1140 Z" fill="#F3E9D9"></path>
+      <path d="M-60 604 L0 596 C 200 546, 380 606, 560 566 S 900 506, 1080 551 L1140 544 L1140 1140 L-60 1140 Z" fill="#FFFDF8"></path>
+      <ellipse cx="850" cy="400" rx="185" ry="92" fill="#F3E9D9"></ellipse>
+    </g>
+    <g filter="url(#rough)">
+      <use href="#bar" transform="translate(720 340)"></use>
+      <use href="#bar" transform="translate(668 370)"></use>
+      <use href="#bar" transform="translate(694 321)"></use>
+      <use href="#coin" transform="translate(860 462)"></use>
+      <use href="#coin" transform="translate(1000 448)"></use>
+      <use href="#coin" transform="translate(1000 438)"></use>
+      <use href="#person-b" transform="translate(940 432)"></use>
+
+      <g transform="translate(0 14)"><g transform="matrix(0.537 0.31 -0.537 0.31 420 612)"><rect width="340" height="640" rx="44" fill="#C9BFAF"></rect></g></g>
+      <g transform="matrix(0.537 0.31 -0.537 0.31 420 612)"><use href="#phone"></use></g>
+      <use href="#person-a" transform="translate(470 905) scale(-1 1)"></use>
+      <use href="#coin" transform="translate(120 985)"></use>
+      <use href="#coin" transform="translate(186 1018)"></use>
+      <use href="#coin" transform="translate(560 1000)"></use>
+    </g>
+    <use href="#mark-up" transform="translate(600 92)" filter="url(#soft)"></use>
+    <use href="#mark-zig" transform="translate(968 110)" filter="url(#soft)"></use>
+    <rect width="1080" height="1080" filter="url(#grain-dark)" opacity="0.5"></rect>
+    <rect width="1080" height="1080" filter="url(#grain-light)" opacity="0.45"></rect>
+  </svg>
+
+  <svg style="position: absolute; left: 64px; top: 60px" width="222" height="129" viewBox="0 0 370 215" role="img" aria-label="Gold Daily"><use href="#logo"></use></svg>
+  <h1 class="h" style="left: 64px; top: 214px; font-size: 96px"><span class="mark">金金</span>計較，<br>天天報到。</h1>
+  <p class="sub" style="left: 64px; top: 462px; font-size: 28px">每個交易日早上九點，<br>國際金價自動送到你的 Telegram。</p>
+
+  <div class="cta" style="left: 610px; top: 772px; width: 410px">
+    <div class="more"><span class="en" style="font-size: 46px; line-height: 1">Subscribe</span><svg width="200" height="34" viewBox="0 0 250 40" aria-hidden="true"><use href="#pen-line"></use></svg></div>
+    <div class="cta-row">
+      <div class="qr" data-qr style="width: 132px; height: 132px; padding: 10px"></div>
+      <div class="cta-text">
+        <span class="label" style="font-size: 20px">Telegram 搜尋</span>
+        <span class="bot" style="font-size: 28px" data-bot></span>
+        <span class="label" style="font-size: 18px">按「開始」免費訂閱</span>
+      </div>
+    </div>
+  </div>
+  <p class="note" style="left: 64px; bottom: 26px; font-size: 17px">每個交易日 09:00（台灣時間）推播・價格僅供參考，不構成投資建議</p>
+</section>
+
+<!-- ============ 限時動態 1080×1920：早安，今天的金價來囉 ============ -->
+<section id="story" class="board" style="width: 1080px; height: 1920px">
+  <svg class="art" width="1080" height="1920" viewBox="0 0 1080 1920" aria-hidden="true">
+    <rect width="1080" height="1920" filter="url(#mottle)" opacity="0.35"></rect>
+    <g filter="url(#rough)">
+      <path d="M-60 778 L0 770 C 220 720, 420 780, 620 740 S 940 680, 1080 725 L1140 718 L1140 1478 L1080 1470 C 860 1520, 640 1450, 440 1495 S 120 1540, 0 1500 L-60 1494 Z" fill="#F3E9D9"></path>
+      <path d="M-60 800 L0 792 C 220 742, 420 802, 620 762 S 940 702, 1080 747 L1140 740 L1140 1498 L1080 1490 C 860 1540, 640 1470, 440 1515 S 120 1560, 0 1520 L-60 1514 Z" fill="#FFFDF8"></path>
+    </g>
+    <g filter="url(#rough)">
+      <g transform="translate(0 16)"><g transform="matrix(0.693 0.4 -0.693 0.4 644 860)"><rect width="340" height="640" rx="44" fill="#C9BFAF"></rect></g></g>
+      <g transform="matrix(0.693 0.4 -0.693 0.4 644 860)"><use href="#phone"></use></g>
+      <use href="#person-a" transform="translate(388 1150)"></use>
+      <use href="#bar" transform="translate(150 1330)"></use>
+      <use href="#bar" transform="translate(98 1360)"></use>
+      <use href="#bar" transform="translate(124 1302)"></use>
+      <use href="#coin" transform="translate(620 1380)"></use>
+      <use href="#coin" transform="translate(690 1418)"></use>
+      <use href="#coin" transform="translate(690 1408)"></use>
+      <use href="#person-b" transform="translate(900 1330)"></use>
+      <use href="#coin" transform="translate(1000 1200)"></use>
+    </g>
+    <use href="#mark-up" transform="translate(110 296)" filter="url(#soft)"></use>
+    <use href="#mark-zig" transform="translate(900 250)" filter="url(#soft)"></use>
+    <use href="#coin-light" transform="translate(960 1640)"></use>
+    <use href="#coin-light" transform="translate(110 1700)"></use>
+    <rect width="1080" height="1920" filter="url(#grain-dark)" opacity="0.5"></rect>
+    <rect width="1080" height="1920" filter="url(#grain-light)" opacity="0.45"></rect>
+  </svg>
+
+  <svg style="position: absolute; left: 392px; top: 104px" width="296" height="172" viewBox="0 0 370 215" role="img" aria-label="Gold Daily"><use href="#logo"></use></svg>
+  <h1 class="h" style="left: 0; right: 0; top: 330px; text-align: center"><span style="font-size: 132px"><span class="mark">早安</span>，</span><br><span style="font-size: 96px">今天的金價來囉。</span></h1>
+  <p class="sub" style="left: 0; right: 0; top: 630px; text-align: center; font-size: 32px">每個交易日早上九點，國際金價自動送到你的 Telegram。</p>
+
+  <div class="cta" style="left: 0; right: 0; top: 1588px; align-items: center">
+    <div class="more"><span class="en" style="font-size: 56px; line-height: 1">Subscribe</span><svg width="240" height="40" viewBox="0 0 250 40" aria-hidden="true"><use href="#pen-line"></use></svg></div>
+    <div class="cta-row">
+      <div class="qr" data-qr style="width: 170px; height: 170px; padding: 12px"></div>
+      <div class="cta-text">
+        <span class="label" style="font-size: 26px">Telegram 搜尋</span>
+        <span class="bot" style="font-size: 38px" data-bot></span>
+        <span class="label" style="font-size: 24px">按「開始」免費訂閱・/stop 隨時取消</span>
+      </div>
+    </div>
+  </div>
+  <p class="note" style="left: 0; right: 0; bottom: 34px; text-align: center; font-size: 20px">每個交易日 09:00（台灣時間）推播・價格僅供參考，不構成投資建議</p>
+</section>
+
+<!-- ============ 分享橫幅 1200×630：金價不用盯，金條幫你報 ============ -->
+<section id="banner" class="board" style="width: 1200px; height: 630px">
+  <svg class="art" width="1200" height="630" viewBox="0 0 1200 630" aria-hidden="true">
+    <rect width="1200" height="630" filter="url(#mottle)" opacity="0.35"></rect>
+    <g filter="url(#rough)">
+      <path d="M702 -60 H1260 V690 H570 L582 630 C 662 540, 592 420, 672 330 S 642 110, 702 0 Z" fill="#F3E9D9"></path>
+      <path d="M724 -60 H1260 V690 H592 L604 630 C 684 540, 614 420, 694 330 S 664 110, 724 0 Z" fill="#FFFDF8"></path>
+    </g>
+    <g filter="url(#rough)">
+      <use href="#bar" transform="translate(840 236)"></use>
+      <use href="#bar" transform="translate(788 266)"></use>
+      <use href="#bar" transform="translate(814 208)"></use>
+      <use href="#coin" transform="translate(770 430)"></use>
+      <use href="#coin" transform="translate(850 462)"></use>
+      <use href="#coin" transform="translate(850 452)"></use>
+      <use href="#person-b" transform="translate(1040 404)"></use>
+    </g>
+    <use href="#mark-up" transform="translate(556 60) scale(0.8)" filter="url(#soft)"></use>
+    <rect width="1200" height="630" filter="url(#grain-dark)" opacity="0.5"></rect>
+    <rect width="1200" height="630" filter="url(#grain-light)" opacity="0.45"></rect>
+  </svg>
+
+  <svg style="position: absolute; left: 64px; top: 48px" width="185" height="108" viewBox="0 0 370 215" role="img" aria-label="Gold Daily"><use href="#logo"></use></svg>
+  <h1 class="h" style="left: 64px; top: 172px; font-size: 72px">金價不用盯，<br><span class="mark">金條</span>幫你報。</h1>
+  <p class="sub" style="left: 64px; top: 360px; font-size: 24px">每個交易日早上九點，國際金價<br>自動送到你的 Telegram。</p>
+  <div class="cta" style="left: 64px; top: 464px; gap: 8px">
+    <div class="more"><span class="en" style="font-size: 40px; line-height: 1">Subscribe</span><svg width="180" height="30" viewBox="0 0 250 40" aria-hidden="true"><use href="#pen-line"></use></svg></div>
+    <span class="cta-text" style="flex-direction: row; gap: 10px; align-items: baseline"><span class="label" style="font-size: 20px">Telegram 搜尋</span><span class="bot" style="font-size: 26px" data-bot></span></span>
+  </div>
+  <div class="qr" data-qr style="position: absolute; right: 40px; bottom: 36px; width: 120px; height: 120px; padding: 8px"></div>
+  <p class="note" style="left: 64px; bottom: 22px; font-size: 15px">免費訂閱・/stop 隨時取消・價格僅供參考，不構成投資建議</p>
+</section>
+
+<!-- ============ Telegram bot 大頭貼 640×640（會被裁成圓形，重點都在中間） ============ -->
+<section id="avatar" class="board" style="width: 640px; height: 640px">
+  <svg class="art" width="640" height="640" viewBox="0 0 640 640" aria-hidden="true">
+    <rect width="640" height="640" filter="url(#mottle)" opacity="0.35"></rect>
+    <g filter="url(#rough)">
+      <ellipse cx="320" cy="424" rx="226" ry="108" fill="#FFFDF8"></ellipse>
+      <use href="#bar" transform="translate(328.4 283.5) scale(1.5)"></use>
+      <use href="#bar" transform="translate(250.5 328.5) scale(1.5)"></use>
+      <use href="#bar" transform="translate(289.4 255) scale(1.5)"></use>
+      <use href="#coin" transform="translate(470 470) scale(1.2)"></use>
+    </g>
+    <use href="#mark-up" transform="translate(430 112) scale(0.9)" filter="url(#soft)"></use>
+    <rect width="640" height="640" filter="url(#grain-dark)" opacity="0.5"></rect>
+    <rect width="640" height="640" filter="url(#grain-light)" opacity="0.45"></rect>
+  </svg>
+</section>
+
+<!-- ============ logo：透明底 740×430、芥末底 1000×600 ============ -->
+<section id="logo-clear" class="board clear" style="width: 740px; height: 430px">
+  <svg width="740" height="430" viewBox="0 0 370 215" role="img" aria-label="Gold Daily" style="display: block"><use href="#logo"></use></svg>
+</section>
+<section id="logo-mustard" class="board" style="width: 1000px; height: 600px">
+  <svg class="art" width="1000" height="600" viewBox="0 0 1000 600" aria-hidden="true">
+    <rect width="1000" height="600" filter="url(#mottle)" opacity="0.35"></rect>
+    <rect width="1000" height="600" filter="url(#grain-dark)" opacity="0.5"></rect>
+    <rect width="1000" height="600" filter="url(#grain-light)" opacity="0.45"></rect>
+  </svg>
+  <svg style="position: absolute; left: 130px; top: 85px" width="740" height="430" viewBox="0 0 370 215" role="img" aria-label="Gold Daily"><use href="#logo"></use></svg>
+</section>
+
+<!-- ============ 網站用：橫式字標（頁首）540×128、圖示（favicon 用 ?board=icon&size=16/32/48）、主畫面圖示 180 ============ -->
+<section id="wordmark" class="board clear" style="width: 540px; height: 128px">
+  <svg width="540" height="128" viewBox="0 0 540 128" role="img" aria-label="Gold Daily" style="display: block">
+    <g fill="none" stroke="#231815" stroke-width="26" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M76.2 23.8 A37 37 0 1 0 87 50 L60 50"></path>
+      <path d="M226 13 V87 H272"></path>
+      <path d="M304 13 V87 H320 A37 37 0 0 0 320 13 Z"></path>
+    </g>
+    <circle cx="158" cy="50" r="40" fill="#FFFDF8" stroke="#231815" stroke-width="12"></circle>
+    <circle cx="158" cy="50" r="12" fill="#231815"></circle>
+    <text x="388" y="98" font-family="'Cormorant Garamond', serif" font-style="italic" font-weight="700" font-size="84" fill="#231815">daily</text>
+  </svg>
+</section>
+<section id="icon" class="board clear" style="width: 48px; height: 48px">
+  <svg width="100%" height="100%" viewBox="0 0 48 48" aria-hidden="true" style="display: block">
+    <rect x="1" y="1" width="46" height="46" rx="11" fill="#E9AE40"></rect>
+    <circle cx="24" cy="24" r="14" fill="#FFFDF8" stroke="#231815" stroke-width="6"></circle>
+    <circle cx="24" cy="24" r="5" fill="#231815"></circle>
+  </svg>
+</section>
+<section id="apple-icon" class="board" style="width: 180px; height: 180px">
+  <svg class="art" width="180" height="180" viewBox="0 0 180 180" aria-hidden="true">
+    <rect width="180" height="180" filter="url(#mottle)" opacity="0.35"></rect>
+    <rect width="180" height="180" filter="url(#grain-dark)" opacity="0.4"></rect>
+    <circle cx="90" cy="90" r="46" fill="#FFFDF8" stroke="#231815" stroke-width="18"></circle>
+    <circle cx="90" cy="90" r="16" fill="#231815"></circle>
+  </svg>
+</section>
+
+<!-- ============ Telegram bot 介紹圖 640×360（使用者打開 bot、還沒按「開始」時看到的圖） ============ -->
+<section id="intro" class="board" style="width: 640px; height: 360px">
+  <svg class="art" width="640" height="360" viewBox="0 0 640 360" aria-hidden="true">
+    <rect width="640" height="360" filter="url(#mottle)" opacity="0.35"></rect>
+    <g filter="url(#rough)">
+      <path d="M392 -40 H700 V400 H318 L330 360 C 372 300, 334 236, 378 186 S 360 60, 392 0 Z" fill="#F3E9D9"></path>
+      <path d="M404 -40 H700 V400 H330 L342 360 C 384 300, 346 236, 390 186 S 372 60, 404 0 Z" fill="#FFFDF8"></path>
+    </g>
+    <g filter="url(#rough)">
+      <use href="#bar" transform="translate(470 130) scale(0.62)"></use>
+      <use href="#bar" transform="translate(438 149) scale(0.62)"></use>
+      <use href="#bar" transform="translate(454 113) scale(0.62)"></use>
+      <use href="#coin" transform="translate(440 262) scale(0.6)"></use>
+      <use href="#coin" transform="translate(486 280) scale(0.6)"></use>
+      <use href="#coin" transform="translate(486 274) scale(0.6)"></use>
+      <use href="#person-b" transform="translate(578 266) scale(0.62)"></use>
+    </g>
+    <use href="#mark-up" transform="translate(320 26) scale(0.5)" filter="url(#soft)"></use>
+    <rect width="640" height="360" filter="url(#grain-dark)" opacity="0.5"></rect>
+    <rect width="640" height="360" filter="url(#grain-light)" opacity="0.45"></rect>
+  </svg>
+  <svg style="position: absolute; left: 36px; top: 28px" width="141" height="82" viewBox="0 0 370 215" role="img" aria-label="Gold Daily"><use href="#logo"></use></svg>
+  <h1 class="h" style="left: 36px; top: 126px; font-size: 46px"><span class="mark">金金</span>計較，<br>天天報到。</h1>
+  <p class="sub" style="left: 36px; top: 248px; font-size: 16px">每個交易日早上九點，<br>國際金價和走勢圖送到這裡。</p>
+  <p class="sub" style="left: 36px; top: 308px; font-size: 18px; font-weight: 900">按下方「開始」免費訂閱 ↓</p>
+</section>
+
+<script>
+  // 填 bot 的 username（@ 後面那串）就會顯示真的名稱並產生 QR code；留空時顯示預留位置
+  const BOT = 'GoldEchoBot';
+
+  const board = new URLSearchParams(location.search).get('board');
+  if (board) {
+    document.body.classList.add('single');
+    const el = document.getElementById(board);
+    el?.classList.add('on');
+    // 圖示可以指定輸出尺寸：?board=icon&size=16
+    const size = new URLSearchParams(location.search).get('size');
+    if (el && size) Object.assign(el.style, { width: `${size}px`, height: `${size}px` });
+  } else {
+    document.body.classList.add('gallery');
+  }
+  for (const el of document.querySelectorAll('[data-bot]')) el.textContent = BOT ? `@${BOT}` : '@[你的 bot 名稱]';
+  for (const el of document.querySelectorAll('[data-qr]')) {
+    if (BOT && window.qrcode) {
+      const qr = qrcode(0, 'M');
+      qr.addData(`https://t.me/${BOT}`);
+      qr.make();
+      el.innerHTML = qr.createSvgTag(4, 0);
+    } else {
+      el.classList.add('empty');
+      el.innerHTML = 'QR code<br>（填入 bot 名稱）';
+    }
+  }
+</script>
+</body>
+</html>

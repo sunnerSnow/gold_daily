@@ -5,3 +5,6 @@
 node_modules/
 .DS_Store
 Thumbs.db
+
+# 推廣圖輸出（用 design/promo/render.sh 隨時重新產生）
+design/promo/png/

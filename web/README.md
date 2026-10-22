@@ -1,10 +1,11 @@
-# Gold Daily — 每日黃金價格追蹤與 LINE 推播
+# Gold Daily — 每日黃金價格追蹤與 LINE／Telegram 推播
 
-個人使用的金價追蹤工具：每天定時取得金價、存歷史快照、推播 LINE 每日行情，漲跌達門檻時另外提醒。
+金價追蹤工具：每天定時取得金價、存歷史快照、推播 LINE 與 Telegram 每日行情，漲跌達門檻時另外提醒。
 
 > **目前狀態（2026-10-15）**：已上線（Vercel 東京 `hnd1`＋Supabase 東京），由 Supabase pg_cron 每 15 分鐘觸發排程。
 > - 行情來源：**GoldAPI.io 免費方案**（每月 100 次），交易日 09:00（每日推播）＋ 21:30（盤中檢查）查價，週末不查價，每月約 44 次。
 > - 推播：每日行情是 LINE 卡片（漲紅跌綠＋近 30 個交易日走勢圖），預設群發給官方帳號所有好友；另有百分比異動提醒與到價提醒（觸發一次就自動關閉）。
+> - Telegram（2026-10-22 起）：[@GoldEchoBot](https://t.me/GoldEchoBot) 開放訂閱，每日行情與提醒跟 LINE 同時送出，任何人按「開始」就收得到。
 > - LINE 訊息與行情 API 都有額度保護，不會自動升級或加購。
 > - 沒有金鑰時可用 Mock Provider 在本機開發（畫面與推播都會標示「模擬資料」）。
 
@@ -186,6 +187,54 @@ Telegram 的收件人有兩種：
 
 **費用與限制**：Telegram Bot API 免費、不限則數，不占 LINE 額度，訂閱的人再多也不用錢；GoldAPI 的查價次數也跟收件人數無關。Telegram 每秒最多約 30 則，所以每批送 25 個聊天室、批次之間隔 1 秒；排程最多跑 60 秒，一次推播最多送 1,000 位訂閱者，再多要改成分批排程。Token 只放在伺服器端；畫面只顯示「已設定」、bot 名稱、頻道名稱與數字 ID 的末 4 碼。
 
+### 推廣素材與 bot 設定
+
+目前的 bot 是 [@GoldEchoBot](https://t.me/GoldEchoBot)，訂閱連結 `https://t.me/GoldEchoBot`。
+
+推廣圖與 logo 的原始檔是 `../design/promo/promo.html`（風格參考 [nsl-jp.com](https://www.nsl-jp.com/)），在專案根目錄執行 `bash design/promo/render.sh` 會用本機的 Chrome 輸出 PNG 到 `design/promo/png/`（需要網路載入字型與 QR code 函式庫；圖檔不進版控）。換 bot 時改 `promo.html` 最後的 `const BOT = 'GoldEchoBot'`，名稱與 QR code 會一起更新。各張圖的尺寸與用途見[專案首頁的 README](../README.md#推廣素材)。
+
+網站用的 logo 也從這裡輸出，改了 logo 要重新複製：
+
+| 輸出檔 | 複製到 | 用途 |
+|---|---|---|
+| `png/wordmark.png` | `src/assets/logo-wordmark.png` | 頁首的橫式字標 |
+| `png/logo-clear.png` | `src/assets/logo.png` | 登入頁、專案首頁 README |
+| `png/favicon.ico` | `src/app/favicon.ico` | 瀏覽器分頁圖示（16／32／48，`make-ico.py` 打包） |
+| `png/apple-icon.png` | `src/app/apple-icon.png` | 手機主畫面圖示 |
+
+bot 的圖與說明文字在 Telegram 的 [@BotFather](https://t.me/BotFather) 設定：傳 `/mybots` → 選 bot →「Edit Bot」，圖片要用「照片」傳，不要用「檔案」。
+
+| 項目 | BotFather 選項 | 內容 |
+|---|---|---|
+| 大頭貼 | Edit Botpic | `png/avatar.png`（會裁成圓形） |
+| 介紹圖 | Edit Description Picture | `png/intro.png`（打開 bot、還沒按「開始」時看到） |
+| 簡介（120 字以內） | Edit About | 見下方 |
+| 說明（512 字以內） | Edit Description | 見下方 |
+| 指令選單 | Edit Commands | 見下方 |
+
+簡介：
+
+```
+每個交易日 09:00 推播國際金價與走勢圖，大漲大跌也會提醒。按「開始」免費訂閱。
+```
+
+說明：
+
+```
+金金計較，天天報到！
+每個交易日早上 9 點（台灣時間），把國際金價、漲跌和近 30 個交易日的走勢圖送到這裡；價格大幅變動或到達目標價時也會通知你。
+
+按下方「開始」免費訂閱，傳 /stop 隨時取消。
+價格僅供參考，不構成投資建議。
+```
+
+指令選單：
+
+```
+start - 訂閱每日金價
+stop - 取消訂閱
+```
+
 ---
 
 ## 排程
@@ -291,7 +340,7 @@ Truney 的金價圖（https://www.truney.com/gold-chart ）由 TradingView 提�
 | Vercel 專案 | 上線 | 已部署（Root Directory `web`，函式在東京 `hnd1`） |
 | `CRON_SECRET`、`ADMIN_PASSWORD`、`SESSION_SECRET` | 排程授權與管理介面登入 | 已設定（CRON_SECRET 同時存在 Supabase Vault） |
 | `LINE_CHANNEL_SECRET` | 只有「只送指定的人」模式需要（webhook 取得 User ID） | 未使用 |
-| `TELEGRAM_BOT_TOKEN`、`TELEGRAM_CHAT_ID` | 選用：同時推播到 Telegram（token 必填；chat ID 是固定收件人，測試推播用） | 已設定（2026-10-22） |
+| `TELEGRAM_BOT_TOKEN`、`TELEGRAM_CHAT_ID` | 選用：同時推播到 Telegram（token 必填；chat ID 是固定收件人，測試推播用） | 已設定（2026-10-22，[@GoldEchoBot](https://t.me/GoldEchoBot) 已開放訂閱） |
 
 ## 已知限制
 

@@ -1,6 +1,6 @@
 import Image from 'next/image';
 import Link from 'next/link';
-import logoMark from '@/assets/logo-mark.png';
+import logoWordmark from '@/assets/logo-wordmark.png';
 import { feedLabel, type Chrome } from '@/lib/view/chrome';
 import { REFERENCE_CHART_URL } from '@/lib/line/messages';
 import { logoutAction } from '@/app/actions';
@@ -47,8 +47,7 @@ export function SiteHeader({ chrome }: { chrome: Chrome }) {
     <header className="site-header">
       <div className="site-header__inner">
         <Link className="brand" href="/">
-          <Image className="brand__mark" src={logoMark} alt="" width={54} height={40} loading="eager" />
-          Gold Daily
+          <Image className="brand__mark" src={logoWordmark} alt="Gold Daily" width={169} height={40} loading="eager" />
         </Link>
         <NavLinks className="nav" ariaLabel="主要導覽" />
         <div className="hchips">

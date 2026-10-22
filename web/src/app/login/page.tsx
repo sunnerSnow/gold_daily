@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 import Image from 'next/image';
 import Link from 'next/link';
-import logoMark from '@/assets/logo-mark.png';
+import logo from '@/assets/logo.png';
 import { LoginForm } from '@/components/login-form';
 import { authMode } from '@/lib/auth/session';
 import { getEnv } from '@/lib/env';
@@ -16,11 +16,8 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
     <div className="app-shell">
       <main className="page on-gold">
         <section className="card login-card" aria-labelledby="login-h">
-          <Image src={logoMark} alt="" width={86} height={64} loading="eager" />
-          <div className="head-stack">
-            <p className="eyebrow">Gold Daily</p>
-            <h1 className="card-title" id="login-h" style={{ fontSize: 28 }}>管理介面登入</h1>
-          </div>
+          <Image src={logo} alt="Gold Daily 每日金價" width={196} height={114} loading="eager" />
+          <h1 className="card-title" id="login-h" style={{ fontSize: 28 }}>管理介面登入</h1>
           {mode === 'login' ? (
             <LoginForm next={next ?? '/'} />
           ) : mode === 'locked' ? (
