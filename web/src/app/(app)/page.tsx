@@ -334,8 +334,8 @@ function FirstRun({ data }: { data: DashboardData }) {
       chip: env.line && env.telegram ? ['chip--ok', '兩邊都已設定'] : env.line ? ['chip--ok', 'LINE 已設定'] : env.telegram ? ['chip--ok', 'Telegram 已設定'] : ['chip--err', '尚未連線'],
       desc:
         env.line || env.telegram
-          ? `${env.line ? '已設定 LINE Channel Access Token。' : ''}${env.telegram ? '已設定 Telegram Bot Token 與 chat ID。' : ''}每日推播與提醒會送到已設定的每個通道。`
-          : '缺少 LINE_CHANNEL_ACCESS_TOKEN（或 Telegram 的 TELEGRAM_BOT_TOKEN 與 TELEGRAM_CHAT_ID），至少設定一個。設定完成前不會送出任何訊息，步驟見 README。',
+          ? `${env.line ? '已設定 LINE Channel Access Token。' : ''}${env.telegram ? '已設定 Telegram Bot Token。' : ''}每日推播與提醒會送到已設定的每個通道。`
+          : '缺少 LINE_CHANNEL_ACCESS_TOKEN（或 Telegram 的 TELEGRAM_BOT_TOKEN），至少設定一個。設定完成前不會送出任何訊息，步驟見 README。',
     },
     { title: '排程授權', done: env.cron, chip: env.cron ? ['chip--ok', '已設定'] : ['chip--err', '未設定'], desc: env.cron ? '排程 API 需帶 Authorization: Bearer CRON_SECRET。' : '缺少 CRON_SECRET（至少 16 字元），排程 API 會拒絕所有請求。' },
     { title: '第一筆每日快照', done: false, chip: ['chip--muted', '尚未執行'], desc: '' },

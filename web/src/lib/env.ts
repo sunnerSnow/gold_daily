@@ -34,7 +34,7 @@ const schema = z.object({
   LINE_CHANNEL_SECRET: optionalText,
   /** Telegram Bot 的 token（@BotFather 建立 bot 時給的） */
   TELEGRAM_BOT_TOKEN: optionalText,
-  /** Telegram 推播對象：一個或多個 chat ID（個人、群組，或頻道的 @username），用逗號分隔 */
+  /** Telegram 固定收件人（選填）：一個或多個 chat ID（個人、群組，或頻道的 @username），用逗號分隔；測試推播只送這些 */
   TELEGRAM_CHAT_ID: optionalText,
   GOLD_PRICE_PROVIDER: optionalText,
   GOLD_PRICE_API_KEY: optionalText,
@@ -126,15 +126,15 @@ export function checkEnv(env: AppEnv): EnvStatus {
     supabase = false;
   }
 
-  // Telegram 是選用的：兩個都沒填不算問題，填一半或格式錯才提示
+  // Telegram 是選用的：沒填不算問題，填一半或格式錯才提示。
+  // 有 token 就算已設定（推播給訂閱者）；TELEGRAM_CHAT_ID 是固定收件人，測試推播只送這些
   const hasBotToken = Boolean(env.TELEGRAM_BOT_TOKEN);
   const chatIds = parseTelegramChatIds(env.TELEGRAM_CHAT_ID);
-  let telegram = hasBotToken && chatIds.length > 0;
+  let telegram = hasBotToken;
   if (hasBotToken && !TELEGRAM_TOKEN_PATTERN.test(env.TELEGRAM_BOT_TOKEN!)) {
     issues.push({ key: 'TELEGRAM_BOT_TOKEN', message: 'TELEGRAM_BOT_TOKEN 格式不正確（應為 @BotFather 給的「數字:英數字」），Telegram 尚未連線。' });
     telegram = false;
   }
-  if (hasBotToken && chatIds.length === 0) issues.push({ key: 'TELEGRAM_CHAT_ID', message: '有 TELEGRAM_BOT_TOKEN 但缺少 TELEGRAM_CHAT_ID，Telegram 尚未連線。' });
   if (!hasBotToken && chatIds.length > 0) issues.push({ key: 'TELEGRAM_BOT_TOKEN', message: '有 TELEGRAM_CHAT_ID 但缺少 TELEGRAM_BOT_TOKEN，Telegram 尚未連線。' });
   const badChats = chatIds.map((id, i) => (isTelegramChatId(id) ? 0 : i + 1)).filter(Boolean);
   if (badChats.length) {

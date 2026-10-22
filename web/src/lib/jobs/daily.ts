@@ -275,8 +275,13 @@ export function describeEvent(event: EventRow, built?: { withChart: boolean } | 
   const line = `${describeLine(event)}${lineFormat(event, built)}`;
   if (event.telegramStatus === null) return line;
   const telegram = `Telegram ${describeTelegram(event)}${telegramFormat(event, built)}`;
-  if (event.status === 'skipped' && event.skipReason === 'line_not_configured') return telegram;
+  if (lineNotUsed(event)) return telegram;
   return `LINE ${line}・${telegram}`;
+}
+
+/** 這則事件 LINE 那一邊沒有要送（LINE 沒設定，或只測試 Telegram），畫面上不用顯示 LINE */
+export function lineNotUsed(event: EventRow): boolean {
+  return event.status === 'skipped' && (event.skipReason === 'line_not_configured' || event.skipReason === 'not_requested');
 }
 
 /** 排程紀錄裡註明這次是用卡片還是純文字送出 */
@@ -287,14 +292,14 @@ function lineFormat(event: EventRow, built: { withChart: boolean } | null | unde
 }
 
 function telegramFormat(event: EventRow, built: { withChart: boolean } | null | undefined): string {
-  if (event.telegramStatus !== 'sent' || !built?.withChart) return '';
+  if (event.telegramStatus !== 'sent' || event.telegramSentTo.length === 0 || !built?.withChart) return '';
   return event.telegramLastError === PHOTO_DROPPED_NOTE ? `（${PHOTO_DROPPED_NOTE}）` : '（走勢圖）';
 }
 
 export function describeTelegram(event: EventRow): string {
   switch (event.telegramStatus) {
     case 'sent':
-      return '已送出';
+      return event.telegramSentTo.length === 0 ? '沒有收件人' : '已送出';
     case 'failed':
       return `發送失敗（第 ${event.telegramAttemptCount} 次）`;
     case 'sending':
@@ -318,6 +323,7 @@ export function describeLine(event: EventRow): string {
         quota_insufficient: '未發送：額度不足',
         cooldown: '冷卻中・未發送',
         stale_quote: '未發送：報價過期',
+        not_requested: '未發送：只測試 Telegram',
       }[event.skipReason ?? 'line_not_configured'];
     case 'sending':
       return '發送中';

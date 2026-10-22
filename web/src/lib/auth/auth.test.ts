@@ -88,6 +88,32 @@ describe('LINE webhook 路由', () => {
   });
 });
 
+describe('Telegram webhook 路由', () => {
+  afterEach(() => vi.unstubAllEnvs());
+  beforeEach(() => {
+    for (const key of ['LINE_CHANNEL_ACCESS_TOKEN', 'LINE_USER_ID', 'TELEGRAM_BOT_TOKEN', 'TELEGRAM_CHAT_ID', 'SUPABASE_URL', 'SUPABASE_SERVICE_ROLE_KEY']) vi.stubEnv(key, '');
+  });
+  const post = async (body: string, secret?: string) => {
+    vi.resetModules();
+    const { POST } = await import('@/app/api/telegram/webhook/route');
+    return POST(new Request('https://example.test/api/telegram/webhook', { method: 'POST', body, headers: secret ? { 'x-telegram-bot-api-secret-token': secret } : {} }));
+  };
+
+  it('沒設定 Telegram 時一律拒絕', async () => {
+    expect((await post('{"update_id":1}')).status).toBe(503);
+  });
+
+  it('secret 錯誤回 401；正確回 200（沒有訊息的 update 不會呼叫 Telegram）', async () => {
+    const token = '123456:route-test-token';
+    vi.stubEnv('TELEGRAM_BOT_TOKEN', token);
+    vi.stubEnv('GOLD_PRICE_PROVIDER', 'mock');
+    const { telegramWebhookSecret } = await import('../telegram/webhook');
+    expect((await post('{"update_id":1}')).status).toBe(401);
+    expect((await post('{"update_id":1}', 'wrong')).status).toBe(401);
+    expect((await post('{"update_id":1}', telegramWebhookSecret(token))).status).toBe(200);
+  });
+});
+
 describe('環境變數檢查', () => {
   it('LINE_USER_ID 可以填多個（逗號分隔），重複的只算一次', async () => {
     const { parseLineUserIds } = await import('../env');
@@ -193,10 +219,13 @@ describe('環境變數檢查', () => {
     expect(JSON.stringify(ok)).not.toContain('secret-AAH_x');
   });
 
-  it('Telegram 只設一半或格式錯時提示，並視為未連線', () => {
-    const noChat = checkEnv(readEnv({ TELEGRAM_BOT_TOKEN: '123456:abc' }));
-    expect(noChat.telegram).toBe(false);
-    expect(noChat.issues.some((i) => i.key === 'TELEGRAM_CHAT_ID')).toBe(true);
+  it('只有 token 就算已設定（推播給訂閱者）；chat ID 沒填不算問題', () => {
+    const tokenOnly = checkEnv(readEnv({ TELEGRAM_BOT_TOKEN: '123456:abc' }));
+    expect(tokenOnly.telegram).toBe(true);
+    expect(tokenOnly.issues.some((i) => i.key.startsWith('TELEGRAM_'))).toBe(false);
+  });
+
+  it('Telegram 只有 chat ID 或格式錯時提示，並視為未連線', () => {
     expect(checkEnv(readEnv({ TELEGRAM_CHAT_ID: '123' })).issues.some((i) => i.key === 'TELEGRAM_BOT_TOKEN')).toBe(true);
     const badToken = checkEnv(readEnv({ TELEGRAM_BOT_TOKEN: 'not-a-token', TELEGRAM_CHAT_ID: '123' }));
     expect(badToken.telegram).toBe(false);

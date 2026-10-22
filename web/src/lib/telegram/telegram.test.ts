@@ -2,8 +2,11 @@ import { describe, expect, it } from 'vitest';
 import { computeChange } from '../gold/math';
 import { safeErrorMessage } from '../jobs/deps';
 import { formatDailyMessage, type DailyMessageInput } from '../line/messages';
+import { FakeTelegram } from '../jobs/test-helpers';
+import { MemoryStore } from '../store/memory';
 import { chatLabel, HttpTelegramClient } from './client';
 import { buildDailyTelegram, buildTestTelegram, dailyCaption, escapeHtml, telegramText } from './format';
+import { commandOf, handleTelegramUpdate, telegramWebhookSecret, verifyTelegramWebhookSecret } from './webhook';
 
 // Telegram 用戶端與訊息格式：用假的 fetch，絕不呼叫真的 Telegram。
 
@@ -33,11 +36,47 @@ describe('HttpTelegramClient.send', () => {
     expect(body(f.calls[0].init)).toEqual({ chat_id: '1001', text: '<b>hi</b>', parse_mode: 'HTML', link_preview_options: { is_disabled: true } });
   });
 
-  it('圖片：sendPhoto，圖片用網址、說明用 HTML', async () => {
+  it('圖片：sendPhoto，圖片用網址、說明用 HTML 並放在圖片上方；連結做成按鈕', async () => {
     const f = fakeFetch([json(200, { ok: true })]);
-    await new HttpTelegramClient(TOKEN, ['@gold_channel'], f.impl).send('@gold_channel', { type: 'photo', photoUrl: 'https://gold.example/c.png', caption: '<b>x</b>' });
+    const link = { label: '查看黃金走勢', url: 'https://www.truney.com/gold-chart' };
+    await new HttpTelegramClient(TOKEN, ['@gold_channel'], f.impl).send('@gold_channel', { type: 'photo', photoUrl: 'https://gold.example/c.png', caption: '<b>x</b>', link });
     expect(f.calls[0].url).toBe(`https://api.telegram.org/bot${TOKEN}/sendPhoto`);
-    expect(body(f.calls[0].init)).toEqual({ chat_id: '@gold_channel', photo: 'https://gold.example/c.png', caption: '<b>x</b>', parse_mode: 'HTML' });
+    expect(body(f.calls[0].init)).toEqual({
+      chat_id: '@gold_channel',
+      photo: 'https://gold.example/c.png',
+      caption: '<b>x</b>',
+      parse_mode: 'HTML',
+      show_caption_above_media: true,
+      reply_markup: { inline_keyboard: [[{ text: '查看黃金走勢', url: 'https://www.truney.com/gold-chart' }]] },
+    });
+  });
+
+  it('開放訂閱：setWebhook 帶 secret，只收訊息與封鎖事件；可以查 webhook 狀態與 bot 名稱', async () => {
+    const f = fakeFetch([
+      json(200, { ok: true, result: true }),
+      json(200, { ok: true, result: { url: 'https://gold.example/api/telegram/webhook', pending_update_count: 2, last_error_date: 1792540800, last_error_message: 'Wrong response from the webhook: 500' } }),
+      json(200, { ok: true, result: { id: 1, is_bot: true, username: 'gold_daily_bot' } }),
+    ]);
+    const c = new HttpTelegramClient('999:webhook-test-token', [], f.impl);
+    expect(await c.setWebhook('https://gold.example/api/telegram/webhook', 's3cret')).toEqual({ ok: true });
+    expect(body(f.calls[0].init)).toEqual({ url: 'https://gold.example/api/telegram/webhook', secret_token: 's3cret', allowed_updates: ['message', 'my_chat_member'] });
+    expect(await c.getWebhookInfo()).toEqual({
+      url: 'https://gold.example/api/telegram/webhook',
+      pendingUpdateCount: 2,
+      lastErrorAt: new Date(1792540800 * 1000),
+      lastErrorMessage: 'Wrong response from the webhook: 500',
+    });
+    expect(await c.getUsername()).toBe('gold_daily_bot');
+    // bot 名稱有快取，不會每次都查
+    expect(await c.getUsername()).toBe('gold_daily_bot');
+    expect(f.calls).toHaveLength(3);
+  });
+
+  it('查不到 webhook 狀態或 bot 名稱時回傳 null，不影響畫面', async () => {
+    const f = fakeFetch([json(401, { ok: false, description: 'Unauthorized' }), new Error('network')]);
+    const c = new HttpTelegramClient('998:bad-token', [], f.impl);
+    expect(await c.getWebhookInfo()).toBeNull();
+    expect(await c.getUsername()).toBeNull();
   });
 
   it('403（被封鎖）、400 不重試；429 與 5xx 可以重試；錯誤訊息帶 Telegram 的說明、不帶 token', async () => {
@@ -96,7 +135,7 @@ describe('Telegram 訊息格式', () => {
     expect(escapeHtml('a < b & c > d "e"')).toBe('a &lt; b &amp; c &gt; d "e"');
   });
 
-  it('每日說明：數字跟純文字版一樣，價格與漲跌加粗，附走勢連結', () => {
+  it('每日說明：數字跟純文字版一樣，價格與漲跌加粗；走勢連結做成按鈕（跟 LINE 卡片一樣）', () => {
     const caption = dailyCaption(input)!;
     const plain = formatDailyMessage(input);
     const changeLine = /^[▲▼—] .+$/m.exec(plain)![0];
@@ -104,7 +143,8 @@ describe('Telegram 訊息格式', () => {
     expect(caption).toContain('<b>4,139.68</b> USD / 金衡盎司');
     expect(caption).toContain('前一交易日：4,161.51 USD');
     expect(caption).toContain('<b>💰黃金每日行情</b>');
-    expect(caption).toContain('<a href="https://www.truney.com/gold-chart">查看黃金走勢</a>');
+    expect(caption).not.toContain('<a href');
+    expect(buildDailyTelegram(input, null)?.link).toEqual({ label: '查看黃金走勢', url: 'https://www.truney.com/gold-chart' });
   });
 
   it('過期資料的「資料狀態」加粗提醒', () => {
@@ -130,5 +170,75 @@ describe('Telegram 訊息格式', () => {
     expect(t.caption).toContain('收到這則訊息代表 Telegram 推播設定正確。');
     expect(t.caption).toContain('<b>💰黃金每日行情</b>');
     expect(buildTestTelegram(ts, null)).toMatchObject({ type: 'text' });
+  });
+});
+
+describe('Telegram 訂閱（webhook）', () => {
+  const TOKEN_A = '111:token-a';
+
+  function setup() {
+    const store = new MemoryStore(() => new Date('2026-10-23T01:00:00Z'));
+    const telegram = new FakeTelegram();
+    telegram.configured = true;
+    return { store, telegram, deps: { store, telegram } };
+  }
+  const privateMessage = (text: string, id = 5001) => ({
+    update_id: 1,
+    message: { message_id: 1, text, chat: { id, type: 'private', first_name: '小明', last_name: '王', username: 'ming' } },
+  });
+
+  it('secret 由 token 推導：正確才通過，換 token 就不同', () => {
+    const secret = telegramWebhookSecret(TOKEN_A);
+    expect(secret).toMatch(/^[0-9a-f]{64}$/);
+    expect(verifyTelegramWebhookSecret(secret, TOKEN_A)).toBe(true);
+    expect(verifyTelegramWebhookSecret(null, TOKEN_A)).toBe(false);
+    expect(verifyTelegramWebhookSecret(secret.slice(0, -1) + (secret.endsWith('a') ? 'b' : 'a'), TOKEN_A)).toBe(false);
+    expect(verifyTelegramWebhookSecret(secret, '222:token-b')).toBe(false);
+  });
+
+  it('指令辨識：大小寫、@bot 名稱、後面的參數都不影響', () => {
+    expect(commandOf('/start')).toBe('/start');
+    expect(commandOf('/START@gold_daily_bot abc')).toBe('/start');
+    expect(commandOf('  /stop ')).toBe('/stop');
+    expect(commandOf('hi')).toBeNull();
+  });
+
+  it('/start 訂閱並回覆歡迎訊息；再按一次不會重複，回覆已訂閱', async () => {
+    const { store, telegram, deps } = setup();
+    expect(await handleTelegramUpdate(deps, privateMessage('/start'))).toBe('subscribed');
+    expect(await store.getTelegramSubscriber('5001')).toMatchObject({ status: 'active', name: '小明 王', username: 'ming' });
+    const welcome = telegram.sends[0];
+    expect(welcome.chatId).toBe('5001');
+    expect(welcome.message.type === 'text' && welcome.message.html).toContain('每個交易日 09:00（台灣時間）');
+    expect(welcome.message.type === 'text' && welcome.message.html).toContain('不構成投資建議');
+    expect(await handleTelegramUpdate(deps, privateMessage('/start'))).toBe('already_subscribed');
+    expect(await store.listTelegramSubscribers({ limit: 10 })).toHaveLength(1);
+  });
+
+  it('/stop 取消訂閱；之後再 /start 會重新加入', async () => {
+    const { store, deps } = setup();
+    await handleTelegramUpdate(deps, privateMessage('/start'));
+    expect(await handleTelegramUpdate(deps, privateMessage('/stop'))).toBe('unsubscribed');
+    expect((await store.getTelegramSubscriber('5001'))?.status).toBe('stopped');
+    expect(await handleTelegramUpdate(deps, privateMessage('/start'))).toBe('subscribed');
+    expect((await store.getTelegramSubscriber('5001'))?.status).toBe('active');
+  });
+
+  it('其他訊息回覆用法說明；群組訊息不處理（群組要收推播由管理者設定）', async () => {
+    const { store, telegram, deps } = setup();
+    expect(await handleTelegramUpdate(deps, privateMessage('金價多少？'))).toBe('help');
+    expect(telegram.sends[0].message.type === 'text' && telegram.sends[0].message.html).toContain('/start 訂閱');
+    const group = { update_id: 2, message: { text: '/start', chat: { id: -100123, type: 'supergroup', title: 'G' } } };
+    expect(await handleTelegramUpdate(deps, group)).toBe('ignored');
+    expect(await handleTelegramUpdate(deps, { update_id: 3 })).toBe('ignored');
+    expect(await store.listTelegramSubscribers({ limit: 10 })).toHaveLength(0);
+  });
+
+  it('使用者封鎖 bot 時標成 blocked，之後不會再送給他', async () => {
+    const { store, deps } = setup();
+    await handleTelegramUpdate(deps, privateMessage('/start'));
+    const kicked = { update_id: 4, my_chat_member: { chat: { id: 5001, type: 'private' }, new_chat_member: { status: 'kicked' } } };
+    expect(await handleTelegramUpdate(deps, kicked)).toBe('blocked');
+    expect((await store.getTelegramSubscriber('5001'))?.status).toBe('blocked');
   });
 });

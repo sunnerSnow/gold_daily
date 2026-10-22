@@ -5,7 +5,7 @@ import { ActionButton } from '@/components/action-button';
 import { PageHead } from '@/components/site-chrome';
 import { EventStatusChip, eventNote, JobStatusChip, jobLabel } from '@/components/status-chips';
 import { checkEnv, getEnv, parseTelegramChatIds } from '@/lib/env';
-import { canRetryEvent, MAX_TOTAL_ATTEMPTS } from '@/lib/jobs/notify';
+import { canRetryEvent, MAX_TELEGRAM_SUBSCRIBERS, MAX_TOTAL_ATTEMPTS } from '@/lib/jobs/notify';
 import { REFERENCE_CHART_URL } from '@/lib/line/messages';
 import { estimateMonthlyCalls, hasIntradayChecks } from '@/lib/schedule';
 import { getPageDeps } from '@/lib/server';
@@ -66,6 +66,7 @@ export default async function StatusPage({ searchParams }: { searchParams: Promi
   const cap = quota.officialLimit ?? settings.monthlyMessageQuota;
   const channels = [envStatus.line ? 'LINE' : '', envStatus.telegram ? 'Telegram' : ''].filter(Boolean);
   const telegramChats = envStatus.telegram ? parseTelegramChatIds(env.TELEGRAM_CHAT_ID).length : 0;
+  const telegramSubscribers = envStatus.telegram ? (await deps.store.listTelegramSubscribers({ statuses: ['active'], limit: MAX_TELEGRAM_SUBSCRIBERS })).length : 0;
 
   return (
     <>
@@ -114,7 +115,7 @@ export default async function StatusPage({ searchParams }: { searchParams: Promi
               {envStatus.line || !envStatus.telegram ? (
                 <span className={`chip ${quota.pausedReason ? 'chip--warn' : 'chip--ok'}`}><span className="dot" />{envStatus.telegram ? 'LINE ' : ''}{quota.pausedReason ? '推播暫停' : '推播未暫停'}</span>
               ) : null}
-              {envStatus.telegram ? <span className="chip chip--ok"><span className="dot" />Telegram {telegramChats} 個聊天室</span> : null}
+              {envStatus.telegram ? <span className="chip chip--ok"><span className="dot" />Telegram 訂閱 {telegramSubscribers} 人{telegramChats ? `＋固定 ${telegramChats}` : ''}</span> : null}
             </div>
             <p className="small soft">{data.lastPush ? `最近推播 ${formatTaipei(data.lastPush.sentAt ?? data.lastPush.updatedAt).slice(5)}` : '還沒有推播紀錄'}</p>
           </section>

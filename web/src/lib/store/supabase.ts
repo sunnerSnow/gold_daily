@@ -28,6 +28,8 @@ import {
   type Store,
   type TargetStatus,
   type TelegramStatus,
+  type TelegramSubscriberRow,
+  type TelegramSubscriberStatus,
 } from './types';
 
 // Supabase 實作：只在伺服器端用 service_role 金鑰。錯誤訊息不帶任何金鑰或連線字串。
@@ -184,6 +186,17 @@ function toTarget(r: Row): PriceTargetRow {
     triggeredPrice: num(r.triggered_price),
     triggeredQuoteAt: date(r.triggered_quote_at),
     eventId: num(r.event_id),
+  };
+}
+
+function toSubscriber(r: Row): TelegramSubscriberRow {
+  return {
+    chatId: String(r.chat_id),
+    name: (r.name as string | null) ?? null,
+    username: (r.username as string | null) ?? null,
+    status: r.status as TelegramSubscriberStatus,
+    subscribedAt: new Date(String(r.subscribed_at)),
+    updatedAt: new Date(String(r.updated_at)),
   };
 }
 
@@ -579,5 +592,43 @@ export class SupabaseStore implements Store {
       .gte('called_at', since.toISOString());
     if (r.error) throw new StoreError('統計查價次數', r.error);
     return r.count ?? 0;
+  }
+
+  async subscribeTelegram(input: { chatId: string; name: string | null; username: string | null }) {
+    const prev = await this.db.from('telegram_subscribers').select('status').eq('chat_id', input.chatId).maybeSingle();
+    if (prev.error) throw new StoreError('讀取 Telegram 訂閱者', prev.error);
+    const alreadyActive = prev.data?.status === 'active';
+    const now = new Date().toISOString();
+    const row: Row = { chat_id: input.chatId, name: input.name, username: input.username, status: 'active', updated_at: now };
+    // 取消後重新訂閱：訂閱時間改成這次
+    if (!alreadyActive) row.subscribed_at = now;
+    const r = await this.db.from('telegram_subscribers').upsert(row, { onConflict: 'chat_id' }).select().single();
+    if (r.error) throw new StoreError('寫入 Telegram 訂閱者', r.error);
+    return { subscriber: toSubscriber(r.data), alreadyActive };
+  }
+
+  async getTelegramSubscriber(chatId: string) {
+    const r = await this.db.from('telegram_subscribers').select('*').eq('chat_id', chatId).maybeSingle();
+    if (r.error) throw new StoreError('讀取 Telegram 訂閱者', r.error);
+    return r.data ? toSubscriber(r.data) : null;
+  }
+
+  async setTelegramSubscriberStatus(chatId: string, status: TelegramSubscriberStatus) {
+    const r = await this.db
+      .from('telegram_subscribers')
+      .update({ status, updated_at: new Date().toISOString() })
+      .eq('chat_id', chatId)
+      .select()
+      .maybeSingle();
+    if (r.error) throw new StoreError('更新 Telegram 訂閱者', r.error);
+    return r.data ? toSubscriber(r.data) : null;
+  }
+
+  async listTelegramSubscribers(options: { statuses?: TelegramSubscriberStatus[]; limit: number }) {
+    let q = this.db.from('telegram_subscribers').select('*');
+    if (options.statuses) q = q.in('status', options.statuses);
+    const r = await q.order('subscribed_at', { ascending: false }).limit(options.limit);
+    if (r.error) throw new StoreError('讀取 Telegram 訂閱者', r.error);
+    return (r.data ?? []).map(toSubscriber);
   }
 }

@@ -26,6 +26,8 @@ import {
   type SnapshotRow,
   type Store,
   type TargetStatus,
+  type TelegramSubscriberRow,
+  type TelegramSubscriberStatus,
 } from './types';
 
 // 記憶體實作：測試與「沒有 Supabase 的本機開發」用。資料只存在目前的 Node 行程裡，重啟就清空。
@@ -54,6 +56,7 @@ export class MemoryStore implements Store {
     success: boolean | null;
     error: string | null;
   }[] = [];
+  private subscribers: TelegramSubscriberRow[] = [];
   private settings: SettingsRow;
   private seq = { snapshot: 0, event: 0, job: 0, quota: 0, target: 0, call: 0 };
 
@@ -335,5 +338,38 @@ export class MemoryStore implements Store {
 
   async countProviderCalls(provider: string, since: Date) {
     return this.providerCalls.filter((c) => c.provider === provider && c.calledAt >= since).length;
+  }
+
+  async subscribeTelegram(input: { chatId: string; name: string | null; username: string | null }) {
+    const t = this.now();
+    const row = this.subscribers.find((s) => s.chatId === input.chatId);
+    if (!row) {
+      const created: TelegramSubscriberRow = { ...input, status: 'active', subscribedAt: t, updatedAt: t };
+      this.subscribers.push(created);
+      return { subscriber: { ...created }, alreadyActive: false };
+    }
+    const alreadyActive = row.status === 'active';
+    Object.assign(row, { name: input.name, username: input.username, status: 'active' as const, updatedAt: t }, alreadyActive ? {} : { subscribedAt: t });
+    return { subscriber: { ...row }, alreadyActive };
+  }
+
+  async getTelegramSubscriber(chatId: string) {
+    const row = this.subscribers.find((s) => s.chatId === chatId);
+    return row ? { ...row } : null;
+  }
+
+  async setTelegramSubscriberStatus(chatId: string, status: TelegramSubscriberStatus) {
+    const row = this.subscribers.find((s) => s.chatId === chatId);
+    if (!row) return null;
+    Object.assign(row, { status, updatedAt: this.now() });
+    return { ...row };
+  }
+
+  async listTelegramSubscribers(options: { statuses?: TelegramSubscriberStatus[]; limit: number }) {
+    return this.subscribers
+      .filter((s) => !options.statuses || options.statuses.includes(s.status))
+      .sort((a, b) => b.subscribedAt.getTime() - a.subscribedAt.getTime())
+      .slice(0, options.limit)
+      .map((s) => ({ ...s }));
   }
 }

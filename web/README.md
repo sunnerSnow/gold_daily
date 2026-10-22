@@ -21,7 +21,7 @@
 | 資料 | `src/lib/store/`：`Store` 介面，`SupabaseStore`（正式）與 `MemoryStore`（測試、沒有 Supabase 的本機開發） |
 | LINE | `src/lib/line/`：Push API、額度查詢；重試沿用 `X-Line-Retry-Key`。訊息格式在 `messages.ts`（每日、異動、到價提醒共用同一組格式化函式） |
 | 走勢圖 | `/api/chart/<日期>-compact.png`（每日卡片用的精簡版）與 `/api/chart/<日期>.png`（完整版，舊訊息仍會用到）：用資料庫的每日快照畫近 30 個交易日，放在每日卡片裡（LINE 只算 1 則），不會多查價。LINE 的伺服器要能直接抓，所以不需登入；只畫已存在的日期，其他網址一律 404，同一天的圖交給 CDN 快取。網址要是 https 才會附圖（本機不附）。字型是 `src/assets/fonts/` 的 Noto Sans TC 子集（SIL OFL） |
-| Telegram | `src/lib/telegram/`：選用的第二個推播通道（Bot API `sendMessage`／`sendPhoto`），訊息格式在 `format.ts`，數字跟 LINE 用同一組格式化函式 |
+| Telegram | `src/lib/telegram/`：選用的第二個推播通道（Bot API `sendMessage`／`sendPhoto`），訊息格式在 `format.ts`，數字跟 LINE 用同一組格式化函式；`/api/telegram/webhook` 接收 `/start`、`/stop` 處理訂閱（用 secret 驗證） |
 | LINE webhook | `/api/line/webhook`：好友傳「ID」時回覆他自己的 User ID（加入推播名單用）。用 `LINE_CHANNEL_SECRET` 驗證簽章，沒設定就一律拒絕；不保存任何 ID 或訊息 |
 | 排程工作 | `src/lib/jobs/`：每日行情 `daily.ts`、盤中檢查 `intraday.ts`、額度同步 `maintenance.ts`；只依賴介面，所以可以用假的 LINE 與記憶體資料完整測試 |
 | 排程 API | `/api/cron/daily`、`/api/cron/intraday`、`/api/cron/quota-sync`，GET / POST 都可，需 `Authorization: Bearer <CRON_SECRET>` |
@@ -65,12 +65,12 @@ curl -X POST -H "Authorization: Bearer $CRON_SECRET" http://localhost:3000/api/c
 ## 測試
 
 ```bash
-npm test            # Vitest，209 個測試
+npm test            # Vitest，230 個測試
 npm run typecheck   # tsc --noEmit
 npm run lint
 ```
 
-測試只用假的 LINE（`FakeLine`）、假的 Telegram（`FakeTelegram`）、假的 GoldAPI 回應、記憶體資料與 Mock Provider，**不會連到真的 LINE、Telegram、Supabase、GoldAPI 或任何行情來源**（路由測試也會把相關環境變數清空）。Telegram 另外涵蓋：兩個通道各自發送與記錄、只設定其中一邊、多聊天室重試不重複、走勢圖被拒改送文字。涵蓋：行情解析、漲跌計算、無效／零值、過期判斷、缺少前一交易日、上漲／下跌觸發、未達門檻、冷卻時間、排程重跑不重複推播、LINE 失敗與重試（含 retry key 沿用）、缺少環境變數、未授權排程 API、Mock 與正式來源的區分、LINE 額度保護、LINE 計費月份切換、訊息格式；第 2 版另外涵蓋 GoldAPI 解析與單位核對、查價次數保護、固定時間查價、週末不推播、到價提醒。
+測試只用假的 LINE（`FakeLine`）、假的 Telegram（`FakeTelegram`）、假的 GoldAPI 回應、記憶體資料與 Mock Provider，**不會連到真的 LINE、Telegram、Supabase、GoldAPI 或任何行情來源**（路由測試也會把相關環境變數清空）。Telegram 另外涵蓋：兩個通道各自發送與記錄、只設定其中一邊、多聊天室重試不重複、走勢圖被拒改送文字、訂閱與取消、封鎖 bot、分批發送、測試推播只送固定收件人、webhook secret 驗證。涵蓋：行情解析、漲跌計算、無效／零值、過期判斷、缺少前一交易日、上漲／下跌觸發、未達門檻、冷卻時間、排程重跑不重複推播、LINE 失敗與重試（含 retry key 沿用）、缺少環境變數、未授權排程 API、Mock 與正式來源的區分、LINE 額度保護、LINE 計費月份切換、訊息格式；第 2 版另外涵蓋 GoldAPI 解析與單位核對、查價次數保護、固定時間查價、週末不推播、到價提醒。
 
 兩個 migration 另外用 PGlite（真的 Postgres）各跑兩次驗證過：可重複執行、唯一索引、check 約束、排程鎖、到價提醒只觸發一次、RLS。
 
@@ -83,6 +83,7 @@ npm run lint
    1. `supabase/migrations/20261014000000_init.sql`
    2. `supabase/migrations/20261015000000_targets_and_budget.sql`（固定時間查價、週末、到價提醒、查價紀錄）
    3. `supabase/migrations/20261022000000_telegram.sql`（Telegram 推播的發送紀錄；要在設定 Telegram 環境變數之前執行）
+   4. `supabase/migrations/20261023000000_telegram_subscribers.sql`（Telegram 訂閱者）
 3. 把 Project URL 與 `service_role` key 填進 `SUPABASE_URL`、`SUPABASE_SERVICE_ROLE_KEY`。
 
 所有資料表都開 RLS 且沒有任何 policy：瀏覽器拿不到資料，只有伺服器端用 service role 存取。`SUPABASE_ANON_KEY` 目前沒有使用。
@@ -99,6 +100,7 @@ npm run lint
 | `line_quota_syncs` | **規格外新增**：每次向 LINE 官方查詢訊息用量的結果，額度保護與成本透明都靠它 |
 | `price_targets` | **規格外新增**（到價提醒）：目標價、方向、狀態（啟用／已觸發／已取消）；綁定建立時的來源與商品，不會被其他來源的價格觸發 |
 | `provider_calls` | **規格外新增**：每次呼叫行情 API 前記一筆，用來計算 GoldAPI 免費方案的每月次數 |
+| `telegram_subscribers` | **規格外新增**：Telegram 訂閱者（chat ID、公開的名字與 @username、狀態：訂閱中／已取消／已封鎖 bot） |
 
 `notification_settings` 另外多了 `line_plan`、`monthly_message_quota`、`quota_safety_buffer`（額度設定）、`intraday_mode`、`check_times`、`skip_weekends`（查價時間）與 `mock_scenario`（Mock 測試情境）。`notification_events.event_type` 增加 `target`（到價提醒）；`notification_events` 原本的 `status`、`attempt_count`、`last_error`、`sent_at` 是 LINE 的發送紀錄，Telegram 另有一組 `telegram_*` 欄位（`telegram_sent_to` 記已送達的 chat ID）。
 
@@ -158,21 +160,31 @@ Token 只放在伺服器端環境變數，不會出現在原始碼、前端或 A
 
 ## Telegram 設定（選用）
 
-設定後，每日推播、異動提醒、到價提醒、測試推播都會**同時**送到 LINE 與 Telegram。兩邊分開發送、分開記錄：一邊失敗或略過（例如 LINE 額度不足）不影響另一邊。只設定 Telegram、不設定 LINE 也可以。
+設定後，每日推播、異動提醒、到價提醒都會**同時**送到 LINE 與 Telegram。兩邊分開發送、分開記錄：一邊失敗或略過（例如 LINE 額度不足）不影響另一邊。只設定 Telegram、不設定 LINE 也可以。
 
-1. 先在 Supabase 執行 `supabase/migrations/20261022000000_telegram.sql`（還沒執行就設定 Telegram，發送紀錄會寫入失敗）。
+Telegram 的收件人有兩種：
+
+| | 怎麼加入 | 收到什麼 |
+|---|---|---|
+| **訂閱者** | 任何人私訊 bot 傳 `/start`（或打開 `https://t.me/<bot名稱>` 按「開始」）；傳 `/stop` 取消 | 每日推播、異動提醒、到價提醒 |
+| **固定收件人**（`TELEGRAM_CHAT_ID`，選填） | 管理者在環境變數填 chat ID：自己、群組或頻道 | 上面全部，**加上測試推播** |
+
+測試推播只送固定收件人，不會打擾訂閱者；同一個人同時是訂閱者與固定收件人時只送一次。
+
+1. 先在 Supabase 依序執行 `supabase/migrations/20261022000000_telegram.sql`（發送紀錄）與 `supabase/migrations/20261023000000_telegram_subscribers.sql`（訂閱者）。還沒執行就設定 Telegram，紀錄會寫入失敗。
 2. 在 Telegram 找 [@BotFather](https://t.me/BotFather)，傳 `/newbot` 建立 bot，把拿到的 token 填入 `TELEGRAM_BOT_TOKEN`（存成 Sensitive）。
-3. 決定推播對象，填入 `TELEGRAM_CHAT_ID`（多個用逗號分隔）：
+3. 選填：把自己的 chat ID 填入 `TELEGRAM_CHAT_ID`（測試推播需要；多個用逗號分隔）。**要在開放訂閱之前查**，開放後 `getUpdates` 就不能用了：
    - **自己**：對 bot 傳任意一則訊息，打開 `https://api.telegram.org/bot<TOKEN>/getUpdates`，`message.chat.id` 就是你的 ID（正數）。
    - **群組**：把 bot 加進群組後在群組裡傳一則訊息，同樣用 `getUpdates` 查（負數）。
-   - **頻道**（想讓很多人收到時用這個，效果等同 LINE 的群發）：把 bot 設成頻道管理員（要有發文權限）。公開頻道直接填 `@頻道名稱`；私人頻道在頻道發一則文後用 `getUpdates` 查 `channel_post.chat.id`（`-100` 開頭）。
-4. 重新部署後到「推播設定」按「發送測試推播」，Telegram 收到「Gold Daily 測試推播」就代表設定完成。
+   - **頻道**：把 bot 設成頻道管理員（要有發文權限）。公開頻道直接填 `@頻道名稱`；私人頻道在頻道發一則文後用 `getUpdates` 查 `channel_post.chat.id`（`-100` 開頭）。
+4. 重新部署後到「推播設定」→「Telegram 連線」：按「只發送 Telegram 測試」確認收得到，再按「開放訂閱」。
+5. 把卡片上的訂閱連結（`https://t.me/<bot名稱>`）分享出去，訂閱者會出現在「Telegram 訂閱者」清單，可以移除。
 
-Bot 不能主動私訊沒跟它說過話的人，所以個人收件人一定要先對 bot 傳過訊息；對方封鎖 bot 時會記為發送失敗（403），其他聊天室照常送。
+**開放訂閱的運作**：按「開放訂閱」會呼叫 Telegram 的 `setWebhook`，讓 Telegram 把使用者傳給 bot 的訊息送到 `/api/telegram/webhook`。驗證用的 secret 由 bot token 推導，不用另外設定；換 token 之後要再按一次。只處理私訊：`/start` 訂閱、`/stop` 取消，其他訊息回覆用法說明；封鎖 bot 的人會自動標成「無法傳送」；發送時遇到 403（封鎖、帳號停用）或 400 chat not found 也會標起來，都不算推播失敗（固定收件人送不到則算失敗，方便發現設定錯誤）。資料庫只存對方公開的名字與 @username（後台顯示用），不存訊息內容。
 
-**樣式**：每日推播是一張走勢圖（跟 LINE 卡片同一張），圖片下方的說明文字有價格、漲跌（加粗）、前一交易日、報價時間、資料來源與「查看黃金走勢」連結；Telegram 不能幫文字上色，所以沒有漲紅跌綠。沒有公開的 https 網址（例如本機）、或 Telegram 抓不到圖時，改送同樣的說明文字。異動提醒與到價提醒是純文字，標題加粗。
+**樣式**：每日推播跟 LINE 卡片一樣是說明文字在上、走勢圖在下，下方有「查看黃金走勢」按鈕；說明文字有價格、漲跌（加粗）、前一交易日、報價時間與資料來源。Telegram 不能幫文字上色，所以沒有漲紅跌綠。沒有公開的 https 網址（例如本機）、或 Telegram 抓不到圖時，改送同樣的說明文字（按鈕還在）。異動提醒與到價提醒是純文字，標題加粗。
 
-**費用與限制**：Telegram Bot API 免費、不限則數，不占 LINE 額度。Token 只放在伺服器端；畫面只顯示「已設定」、頻道名稱與數字 ID 的末 4 碼。
+**費用與限制**：Telegram Bot API 免費、不限則數，不占 LINE 額度，訂閱的人再多也不用錢；GoldAPI 的查價次數也跟收件人數無關。Telegram 每秒最多約 30 則，所以每批送 25 個聊天室、批次之間隔 1 秒；排程最多跑 60 秒，一次推播最多送 1,000 位訂閱者，再多要改成分批排程。Token 只放在伺服器端；畫面只顯示「已設定」、bot 名稱、頻道名稱與數字 ID 的末 4 碼。
 
 ---
 
@@ -274,12 +286,12 @@ Truney 的金價圖（https://www.truney.com/gold-chart ）由 TradingView 提�
 | 項目 | 用途 | 狀態（2026-10-15） |
 |---|---|---|
 | GoldAPI.io 的 API key | 正式行情來源（免費方案） | 已設定 |
-| Supabase 專案 URL 與 service role key | 保存資料、pg_cron 排程 | 已設定（東京，三份 migration 已執行，含 2026-10-22 的 Telegram，pg_cron 運作中） |
+| Supabase 專案 URL 與 service role key | 保存資料、pg_cron 排程 | 已設定（東京，四份 migration 已執行，含 2026-10-22、10-23 的 Telegram，pg_cron 運作中） |
 | LINE Channel Access Token | 推播（預設群發給所有好友） | 已設定（輕用量，每月 200 則） |
 | Vercel 專案 | 上線 | 已部署（Root Directory `web`，函式在東京 `hnd1`） |
 | `CRON_SECRET`、`ADMIN_PASSWORD`、`SESSION_SECRET` | 排程授權與管理介面登入 | 已設定（CRON_SECRET 同時存在 Supabase Vault） |
 | `LINE_CHANNEL_SECRET` | 只有「只送指定的人」模式需要（webhook 取得 User ID） | 未使用 |
-| `TELEGRAM_BOT_TOKEN`、`TELEGRAM_CHAT_ID` | 選用：同時推播到 Telegram | 未設定 |
+| `TELEGRAM_BOT_TOKEN`、`TELEGRAM_CHAT_ID` | 選用：同時推播到 Telegram（token 必填；chat ID 是固定收件人，測試推播用） | 已設定（2026-10-22） |
 
 ## 已知限制
 

@@ -69,7 +69,9 @@ export type SkipReason =
   | 'quota_unverified'
   | 'quota_insufficient'
   | 'cooldown'
-  | 'stale_quote';
+  | 'stale_quote'
+  /** 只測試 Telegram 的測試推播：LINE 這一邊本來就不送 */
+  | 'not_requested';
 
 export interface EventRow {
   id: number;
@@ -192,6 +194,20 @@ export type NewPriceTarget = InstrumentKey & Pick<PriceTargetRow, 'direction' | 
 export type ProviderCallEndpoint = 'latest' | 'history' | 'stat';
 export type ProviderCallPurpose = 'daily' | 'check' | 'manual' | 'backfill' | 'reference' | 'stat';
 
+/** active＝會收到推播；stopped＝傳了 /stop 或被管理者移除；blocked＝封鎖了 bot */
+export type TelegramSubscriberStatus = 'active' | 'stopped' | 'blocked';
+
+export interface TelegramSubscriberRow {
+  chatId: string;
+  /** 後台顯示用的名字與 @username（使用者在 Telegram 上公開的資料） */
+  name: string | null;
+  username: string | null;
+  status: TelegramSubscriberStatus;
+  /** 最近一次訂閱的時間 */
+  subscribedAt: Date;
+  updatedAt: Date;
+}
+
 export interface DailySnapshotQuery {
   instrument?: Pick<InstrumentKey, 'source' | 'symbol'>;
   from?: string;
@@ -251,6 +267,14 @@ export interface Store {
   recordProviderCall(input: { provider: string; endpoint: ProviderCallEndpoint; purpose: ProviderCallPurpose; calledAt: Date }): Promise<number>;
   finishProviderCall(id: number, result: { success: boolean; error: string | null }): Promise<void>;
   countProviderCalls(provider: string, since: Date): Promise<number>;
+
+  /** 訂閱 Telegram（已存在就改回 active、更新名字）；alreadyActive 表示原本就在訂閱中 */
+  subscribeTelegram(input: { chatId: string; name: string | null; username: string | null }): Promise<{ subscriber: TelegramSubscriberRow; alreadyActive: boolean }>;
+  getTelegramSubscriber(chatId: string): Promise<TelegramSubscriberRow | null>;
+  /** 改變訂閱狀態；找不到這個聊天室時回傳 null */
+  setTelegramSubscriberStatus(chatId: string, status: TelegramSubscriberStatus): Promise<TelegramSubscriberRow | null>;
+  /** 依最近訂閱時間由新到舊 */
+  listTelegramSubscribers(options: { statuses?: TelegramSubscriberStatus[]; limit: number }): Promise<TelegramSubscriberRow[]>;
 }
 
 export const DEFAULT_SETTINGS: Omit<SettingsRow, 'createdAt' | 'updatedAt'> = {

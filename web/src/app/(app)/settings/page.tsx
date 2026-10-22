@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import { setMockScenarioAction, testPushAction } from '@/app/actions';
+import { removeTelegramSubscriberAction, setMockScenarioAction, setupTelegramWebhookAction, telegramTestPushAction, testPushAction } from '@/app/actions';
 import { ActionButton } from '@/components/action-button';
 import { PriceTargetsCard, type TargetView } from '@/components/price-targets-card';
 import { SettingsForm, type BaselineInfo } from '@/components/settings-form';
@@ -13,6 +13,7 @@ import { PROVIDER_SAFETY_MARGIN } from '@/lib/gold/budget';
 import { MOCK_SCENARIOS } from '@/lib/gold/mock-provider';
 import { latestDailyPreview } from '@/lib/jobs/chart-data';
 import { describeEvent } from '@/lib/jobs/daily';
+import { MAX_TELEGRAM_SUBSCRIBERS } from '@/lib/jobs/notify';
 import { hasIntradayChecks } from '@/lib/schedule';
 import { UNIT_LABEL } from '@/lib/gold/types';
 import { getPageDeps } from '@/lib/server';
@@ -53,18 +54,34 @@ export default async function SettingsPage() {
   const lastTest = (await deps.store.listEvents({ types: ['test'], limit: 1 }))[0] ?? null;
   // 只顯示每個 User ID 的末 4 碼
   const recipientTails = envStatus.line ? parseLineUserIds(env.LINE_USER_ID).map((id) => id.slice(-4)) : [];
-  // Telegram 聊天室：頻道 @username 原樣顯示，數字 ID 只顯示末 4 碼
-  const telegramChats = parseTelegramChatIds(env.TELEGRAM_CHAT_ID);
-  const telegramNote = envStatus.telegram ? `同時送到 Telegram（${telegramChats.length} 個聊天室，不占 LINE 額度）。` : '';
+  // Telegram：固定收件人（頻道 @username 原樣顯示，數字 ID 只顯示末 4 碼）＋訂閱者；測試推播只送固定收件人
+  const telegramChats = envStatus.telegram ? parseTelegramChatIds(env.TELEGRAM_CHAT_ID) : [];
+  const [botUsername, webhookInfo, activeSubscribers, recentSubscribers] = envStatus.telegram
+    ? await Promise.all([
+        deps.telegram.getUsername(),
+        deps.telegram.getWebhookInfo(),
+        deps.store.listTelegramSubscribers({ statuses: ['active'], limit: MAX_TELEGRAM_SUBSCRIBERS }),
+        deps.store.listTelegramSubscribers({ limit: 50 }),
+      ])
+    : [null, null, [], []];
+  const webhookUrl = deps.appUrl?.startsWith('https://') ? `${deps.appUrl}/api/telegram/webhook` : null;
+  const subscriptionOpen = Boolean(webhookUrl && webhookInfo?.url === webhookUrl);
+  const subscribeLink = botUsername ? `https://t.me/${botUsername}` : null;
+  const telegramNote = !envStatus.telegram
+    ? ''
+    : telegramChats.length
+      ? `Telegram 只送固定收件人（${telegramChats.length} 個聊天室），不會送給訂閱者。`
+      : 'Telegram 沒有固定收件人（TELEGRAM_CHAT_ID），這次不會測試 Telegram。';
   const lineAudience = `會送給${envStatus.lineTarget === 'all' ? '所有好友（約 ' : ''}${data.recipients} 人${envStatus.lineTarget === 'all' ? '）' : ''}`;
   const testHint =
     !envStatus.line && envStatus.telegram
-      ? `LINE 尚未連線，只會送到 Telegram（${telegramChats.length} 個聊天室）。`
+      ? `LINE 尚未連線。${telegramNote}`
       : `${lineAudience}，用掉 ${data.recipients} 則訊息額度${data.quota.remaining !== null ? `（保守估算剩餘 ${data.quota.remaining} 則）` : ''}。${telegramNote}`;
   const testConfirm =
     !envStatus.line && envStatus.telegram
-      ? `會送到 Telegram（${telegramChats.length} 個聊天室），確定要發送嗎？`
-      : `${lineAudience}，用掉 ${data.recipients} 則 LINE 訊息額度${envStatus.telegram ? '，並同時送到 Telegram' : ''}，確定要發送嗎？`;
+      ? `會送到 Telegram 的固定收件人（${telegramChats.length} 個聊天室），確定要發送嗎？`
+      : `${lineAudience}，用掉 ${data.recipients} 則 LINE 訊息額度${telegramChats.length ? '，並同時送到 Telegram 的固定收件人' : ''}，確定要發送嗎？`;
+  const SUBSCRIBER_STATUS = { active: ['chip--ok', '訂閱中'], stopped: ['chip--muted', '已取消'], blocked: ['chip--warn', '無法傳送'] } as const;
 
   const quota = data.provider.monthlyCallQuota;
   const targetEvents = new Map(
@@ -130,6 +147,50 @@ export default async function SettingsPage() {
             isMock={data.provider.isMock}
             checkSummary={checkSummary}
           />
+          {envStatus.telegram ? (
+            <section className="card" aria-labelledby="subs-h">
+              <div className="card-head">
+                <div className="head-stack">
+                  <p className="eyebrow">Telegram</p>
+                  <h2 className="card-title" id="subs-h">Telegram 訂閱者</h2>
+                </div>
+                <span className="chip chip--muted">訂閱中 {activeSubscribers.length} 人</span>
+              </div>
+              {recentSubscribers.length === 0 ? (
+                <p className="small soft">
+                  {subscriptionOpen
+                    ? `還沒有人訂閱。把 ${subscribeLink ?? 'bot 的連結'} 分享出去，對方按「開始」就會加入。`
+                    : '開放訂閱後，任何人私訊 bot 傳 /start 就會出現在這裡。'}
+                </p>
+              ) : (
+                <div className="table-wrap">
+                  <table className="tbl tbl--stack">
+                    <thead>
+                      <tr><th>名稱</th><th>帳號</th><th>狀態</th><th>訂閱時間</th><th>操作</th></tr>
+                    </thead>
+                    <tbody>
+                      {recentSubscribers.map((s) => (
+                        <tr key={s.chatId}>
+                          <td className="tbl__title">{s.name ?? '（未提供名字）'}<span className="cell-note num">{chatLabel(s.chatId)}</span></td>
+                          <td data-label="帳號">{s.username ? `@${s.username}` : '—'}</td>
+                          <td data-label="狀態"><span className={`chip ${SUBSCRIBER_STATUS[s.status][0]}`}>{SUBSCRIBER_STATUS[s.status][1]}</span></td>
+                          <td className="num nowrap" data-label="訂閱時間">{formatTaipei(s.subscribedAt, false).slice(5)}</td>
+                          <td data-label="操作">
+                            {s.status === 'active' ? (
+                              <ActionButton action={removeTelegramSubscriberAction} fields={{ chatId: s.chatId }} label="移除" variant="small" confirm="移除後不會再送給這個人；對方再傳 /start 會重新加入。確定要移除嗎？" />
+                            ) : (
+                              <span className="small soft">—</span>
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+              <p className="caption">只顯示最近 50 位。名字與 @username 是對方在 Telegram 上公開的資料，只在後台顯示；封鎖 bot 或刪除帳號的人會自動標成「無法傳送」，不再傳送；對方再傳 /start 會重新加入。</p>
+            </section>
+          ) : null}
           </div>
 
           <div className="col-side">
@@ -191,25 +252,72 @@ export default async function SettingsPage() {
                 </span>
               </div>
               <dl className="kv-list">
-                <dt>Bot Token</dt>
-                <dd>{env.TELEGRAM_BOT_TOKEN ? '已設定（只存在伺服器端）' : '未設定'}</dd>
-                <dt>推播對象</dt>
+                <dt>Bot</dt>
                 <dd>
-                  {envStatus.telegram ? (
-                    <>
-                      {telegramChats.length} 個聊天室・<span className="num">{telegramChats.map(chatLabel).join('、')}</span>
-                      <span className="cell-note">Telegram 不限則數，不占 LINE 額度</span>
-                    </>
-                  ) : env.TELEGRAM_CHAT_ID ? (
-                    '設定不完整，詳見系統狀態的設定檢查'
+                  {subscribeLink ? (
+                    <a className="lnk" href={subscribeLink} target="_blank" rel="noopener noreferrer">@{botUsername}</a>
+                  ) : env.TELEGRAM_BOT_TOKEN ? (
+                    '已設定（只存在伺服器端）'
                   ) : (
                     '未設定'
                   )}
                 </dd>
+                {envStatus.telegram ? (
+                  <>
+                    <dt>訂閱</dt>
+                    <dd>
+                      {subscriptionOpen ? '開放中' : '尚未開放'}・訂閱中 <span className="num">{activeSubscribers.length}</span> 人
+                      <span className="cell-note">Telegram 不限則數，不占 LINE 額度</span>
+                    </dd>
+                  </>
+                ) : null}
+                <dt>固定收件人</dt>
+                <dd>
+                  {telegramChats.length ? (
+                    <>
+                      {telegramChats.length} 個聊天室・<span className="num">{telegramChats.map(chatLabel).join('、')}</span>
+                      <span className="cell-note">每日推播、提醒與測試推播都會送</span>
+                    </>
+                  ) : env.TELEGRAM_CHAT_ID ? (
+                    '設定不完整，詳見系統狀態的設定檢查'
+                  ) : (
+                    <>
+                      未設定<span className="cell-note">選填；測試推播只送固定收件人，要測試請填你自己的 chat ID</span>
+                    </>
+                  )}
+                </dd>
               </dl>
               {!envStatus.telegram ? (
-                <p className="small">選用。設定 TELEGRAM_BOT_TOKEN 與 TELEGRAM_CHAT_ID 後，每日推播與提醒會同時送到 Telegram。設定步驟見 README。</p>
-              ) : null}
+                <p className="small">選用。設定 TELEGRAM_BOT_TOKEN 後，每日推播與提醒會同時送到 Telegram 的訂閱者。設定步驟見 README。</p>
+              ) : (
+                <>
+                  {webhookInfo?.lastErrorMessage && subscriptionOpen ? (
+                    <div className="note note--warn">
+                      <span>Telegram 最近一次呼叫 webhook 失敗：{webhookInfo.lastErrorMessage}</span>
+                    </div>
+                  ) : null}
+                  <div className="divider" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                    <ActionButton
+                      action={telegramTestPushAction}
+                      label="只發送 Telegram 測試"
+                      hint={telegramChats.length ? `只送給固定收件人（${telegramChats.length} 個聊天室），不會送給訂閱者，也不用 LINE 額度。` : '要先在 TELEGRAM_CHAT_ID 填你自己的 chat ID。'}
+                    />
+                    <ActionButton
+                      action={setupTelegramWebhookAction}
+                      label={subscriptionOpen ? '重新設定訂閱' : '開放訂閱'}
+                      variant={subscriptionOpen ? 'small' : undefined}
+                      confirm={subscriptionOpen ? undefined : '開放後，任何人私訊 bot 傳 /start 就會訂閱，並收到每日推播與提醒。確定要開放嗎？'}
+                      hint={
+                        subscriptionOpen
+                          ? `訂閱連結：${subscribeLink ?? '（查不到 bot 名稱）'}，對方按「開始」就會加入。`
+                          : webhookUrl
+                            ? '任何人私訊 bot 傳 /start 就會訂閱、/stop 取消。'
+                            : '需要公開的 https 網址，本機無法開放訂閱。'
+                      }
+                    />
+                  </div>
+                </>
+              )}
             </section>
 
             {data.provider.isMock ? (
@@ -236,7 +344,7 @@ export default async function SettingsPage() {
               {latestDaily ? (
                 <p className="caption">
                   取自 {latestDaily.dailyDate} 的每日快照。LINE 上是卡片樣式：漲跌上色（漲紅、跌綠），走勢圖在文字下方；
-                  {envStatus.telegram ? 'Telegram 上是走勢圖加說明文字（價格與漲跌加粗）；' : null}按「發送測試推播」可以看到實際樣子。
+                  {envStatus.telegram ? 'Telegram 上是說明文字在上、走勢圖在下（價格與漲跌加粗），下方有「查看黃金走勢」按鈕；' : null}按「發送測試推播」可以看到實際樣子。
                 </p>
               ) : null}
             </section>

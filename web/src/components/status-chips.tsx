@@ -1,10 +1,10 @@
-import { describeLine, describeTelegram } from '@/lib/jobs/daily';
+import { describeLine, describeTelegram, lineNotUsed } from '@/lib/jobs/daily';
 import type { EventRow, JobRunRow } from '@/lib/store/types';
 
 // 事件與排程狀態的標籤。狀態一律有文字，不只靠顏色。
 
-/** LINE 沒設定、只送 Telegram 的事件：LINE 那一邊不用顯示 */
-const lineOff = (e: EventRow) => e.status === 'skipped' && e.skipReason === 'line_not_configured';
+/** LINE 沒設定或只測試 Telegram 的事件：LINE 那一邊不用顯示 */
+const lineOff = lineNotUsed;
 
 function LineChip({ event, prefix }: { event: EventRow; prefix: string }) {
   const cls =
@@ -23,7 +23,9 @@ function LineChip({ event, prefix }: { event: EventRow; prefix: string }) {
 
 function TelegramChip({ event }: { event: EventRow }) {
   const cls =
-    event.telegramStatus === 'sent'
+    event.telegramStatus === 'sent' && event.telegramSentTo.length === 0
+      ? 'chip--muted'
+      : event.telegramStatus === 'sent'
       ? event.telegramAttemptCount > 1
         ? 'chip--warn'
         : 'chip--ok'
@@ -53,7 +55,10 @@ function lineNote(event: EventRow): string {
 }
 
 function telegramNote(event: EventRow): string {
-  if (event.telegramStatus === 'sent') return `第 ${event.telegramAttemptCount} 次嘗試送達${event.telegramLastError ? `（${event.telegramLastError}）` : ''}`;
+  if (event.telegramStatus === 'sent' && event.telegramSentTo.length === 0) return event.telegramLastError ?? '';
+  if (event.telegramStatus === 'sent') {
+    return `${event.telegramSentTo.length} 個聊天室・第 ${event.telegramAttemptCount} 次嘗試送達${event.telegramLastError ? `（${event.telegramLastError}）` : ''}`;
+  }
   if (event.telegramLastError) return event.telegramLastError;
   if (event.telegramStatus === 'failed') return `已嘗試 ${event.telegramAttemptCount} 次`;
   return '';

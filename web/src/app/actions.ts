@@ -15,6 +15,7 @@ import { runIntradayJob } from '@/lib/jobs/intraday';
 import { backfillHistory, runQuotaSyncJob } from '@/lib/jobs/maintenance';
 import { retryEvent, sendTestPush } from '@/lib/jobs/notify';
 import { buildDeps, isAdmin } from '@/lib/server';
+import { telegramWebhookSecret } from '@/lib/telegram/webhook';
 import type { SettingsPatch, SettingsRow } from '@/lib/store/types';
 import { hasIntradayChecks, parseCheckTimes } from '@/lib/schedule';
 import { taipeiDate } from '@/lib/time';
@@ -230,6 +231,47 @@ export async function testPushAction(_prev: ActionState): Promise<ActionState> {
       : `Telegram ${describeTelegram(event)}${event.telegramLastError ? `：${event.telegramLastError}` : ''}`,
   );
   return { ok: telegramOk && (lineOk || !deps.line.configured), message: `測試推播：${parts.join('；')}。` };
+}
+
+/** 只送 Telegram 的測試推播：送給固定收件人（TELEGRAM_CHAT_ID），不送訂閱者，也不用 LINE 額度 */
+export async function telegramTestPushAction(_prev: ActionState): Promise<ActionState> {
+  if (!(await isAdmin())) return DENIED;
+  const deps = await buildDeps();
+  if (!deps.telegram.configured) return { ok: false, message: 'Telegram 尚未設定。' };
+  if (deps.telegram.chatIds.length === 0) {
+    return { ok: false, message: '測試推播只送給固定收件人，不會送給訂閱者；請先在 TELEGRAM_CHAT_ID 填你自己的 chat ID。' };
+  }
+  const { event } = await sendTestPush(deps, { telegramOnly: true });
+  revalidatePath('/', 'layout');
+  const ok = event.telegramStatus === 'sent';
+  return {
+    ok,
+    message: ok
+      ? `Telegram 測試推播已送出（${deps.telegram.chatIds.length} 個聊天室${event.telegramLastError ? `，${event.telegramLastError}` : ''}），請查看 Telegram。`
+      : `Telegram 測試推播${describeTelegram(event)}${event.telegramLastError ? `：${event.telegramLastError}` : ''}`,
+  };
+}
+
+/** 開放訂閱：讓 Telegram 把使用者傳給 bot 的訊息送到 /api/telegram/webhook（重按一次也沒關係） */
+export async function setupTelegramWebhookAction(_prev: ActionState): Promise<ActionState> {
+  if (!(await isAdmin())) return DENIED;
+  const deps = await buildDeps();
+  const token = getEnv().TELEGRAM_BOT_TOKEN;
+  if (!deps.telegram.configured || !token) return { ok: false, message: 'Telegram 尚未設定。' };
+  if (!deps.appUrl?.startsWith('https://')) return { ok: false, message: '需要公開的 https 網址才能開放訂閱（本機無法使用）。' };
+  const result = await deps.telegram.setWebhook(`${deps.appUrl}/api/telegram/webhook`, telegramWebhookSecret(token));
+  if (!result.ok) return { ok: false, message: `設定失敗：${result.error}` };
+  return done('已開放訂閱：任何人私訊 bot 傳 /start 就會加入，傳 /stop 取消。');
+}
+
+export async function removeTelegramSubscriberAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
+  if (!(await isAdmin())) return DENIED;
+  const chatId = String(formData.get('chatId') ?? '');
+  if (!/^-?\d+$/.test(chatId)) return { ok: false, message: '聊天室編號不正確。' };
+  const deps = await buildDeps();
+  const row = await deps.store.setTelegramSubscriberStatus(chatId, 'stopped');
+  if (!row) return { ok: false, message: '找不到這位訂閱者。' };
+  return done('已移除這位訂閱者；對方再傳 /start 會重新加入。');
 }
 
 export async function retryEventAction(_prev: ActionState, formData: FormData): Promise<ActionState> {

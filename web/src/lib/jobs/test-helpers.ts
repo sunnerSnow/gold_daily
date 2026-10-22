@@ -2,7 +2,7 @@ import { MockGoldPriceProvider, type MockScenario } from '../gold/mock-provider'
 import type { LineClient, LineMessage, LineQuota, PushResult } from '../line/client';
 import type { FlexMessage } from '../line/flex';
 import { MemoryStore } from '../store/memory';
-import type { TelegramClient, TelegramMessage, TelegramResult } from '../telegram/client';
+import type { TelegramClient, TelegramMessage, TelegramResult, TelegramWebhookInfo } from '../telegram/client';
 import type { JobDeps } from './deps';
 
 // 測試用的假 LINE、假 Telegram 與可控制的時鐘。測試絕不呼叫真的 LINE、Telegram 或行情來源。
@@ -98,6 +98,22 @@ export class FakeTelegram implements TelegramClient {
   /** 某個聊天室實際收到的訊息（不含失敗的） */
   received(chatId: string): TelegramMessage[] {
     return this.sends.filter((s) => s.chatId === chatId && s.ok).map((s) => s.message);
+  }
+
+  username = 'gold_daily_test_bot';
+  webhook: { url: string; secret: string } | null = null;
+
+  async getUsername() {
+    return this.username;
+  }
+
+  async setWebhook(url: string, secret: string): Promise<TelegramResult> {
+    this.webhook = { url, secret };
+    return { ok: true };
+  }
+
+  async getWebhookInfo(): Promise<TelegramWebhookInfo | null> {
+    return { url: this.webhook?.url ?? '', pendingUpdateCount: 0, lastErrorAt: null, lastErrorMessage: null };
   }
 }
 
