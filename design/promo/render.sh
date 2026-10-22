@@ -6,7 +6,6 @@ set -euo pipefail
 cd "$(dirname "$0")"
 CHROME="${CHROME:-/c/Program Files/Google/Chrome/Application/chrome.exe}"
 PAGE="file:///$(pwd -W 2>/dev/null || pwd)/promo.html"
-PROFILE="$(mktemp -d)"
 mkdir -p png
 
 # 輸出檔名 寬 高 網址參數
@@ -27,14 +26,15 @@ BOARDS=(
 
 for entry in "${BOARDS[@]}"; do
   read -r name w h query <<<"$entry"
+  # 每張圖用全新的瀏覽器設定：共用快取時中文字型的載入時機不同，輸出會有細微差異
+  PROFILE="$(mktemp -d)"
   "$CHROME" --headless=new --disable-gpu --hide-scrollbars --force-device-scale-factor=1 \
     --default-background-color=00000000 --user-data-dir="$PROFILE" \
     --virtual-time-budget=12000 --window-size="$w,$h" \
     --screenshot="$(pwd -W 2>/dev/null || pwd)/png/$name.png" "$PAGE?$query" >/dev/null 2>&1
+  rm -rf "$PROFILE"
   echo "png/$name.png"
 done
-
-rm -rf "$PROFILE"
 
 # 網站的分頁圖示：16、32、48 三種尺寸包成一個 favicon.ico
 python -I make-ico.py png/favicon.ico png/icon-16.png png/icon-32.png png/icon-48.png

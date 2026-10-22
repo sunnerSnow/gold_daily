@@ -1,0 +1,267 @@
+<!doctype html>
+<html lang="zh-Hant-TW">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Gold Daily 推廣影片（直式 1080×1920）</title>
+<!-- 直式推廣影片：版面跟 promo.html 的限時動態一樣，依序出場。
+     直接用瀏覽器打開會循環播放預覽；render-video.mjs 帶 ?render 逐格輸出成 MP4。
+     動畫由 renderAt(秒) 依時間算出每一格，不靠 CSS 動畫，所以每次輸出都一樣。 -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@1,600;1,700&family=Noto+Serif+TC:wght@500;700;900&display=swap">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js"></script>
+<style>
+  :root { --mustard: #E9AE40; --paper: #FFFDF8; --ink: #231815; --ink-2: #5E4F3C; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: #8B8478; }
+  body { font-family: 'Noto Serif TC', 'Songti TC', 'PMingLiU', serif; color: var(--ink); }
+  body.render { background: var(--mustard); }
+  .stage { position: relative; width: 1080px; height: 1920px; overflow: hidden; background: var(--mustard); }
+  body:not(.render) .stage { margin: 24px auto; transform: scale(0.45); transform-origin: top center; }
+  .art { position: absolute; inset: 0; display: block; }
+  .en { font-family: 'Cormorant Garamond', 'Times New Roman', serif; font-style: italic; font-weight: 700; letter-spacing: 0.02em; }
+  .h { position: absolute; margin: 0; font-weight: 900; line-height: 1.2; letter-spacing: 0.06em; }
+  .mark { background-image: linear-gradient(transparent 64%, var(--paper) 64%, var(--paper) 90%, transparent 90%); background-repeat: no-repeat; background-size: 0% 100%; }
+  .sub { position: absolute; margin: 0; font-weight: 700; line-height: 1.6; letter-spacing: 0.04em; }
+  .note { position: absolute; margin: 0; font-weight: 500; color: var(--ink-2); letter-spacing: 0.04em; }
+  .more { display: flex; align-items: flex-end; gap: 10px; }
+  .cta { position: absolute; display: flex; flex-direction: column; gap: 16px; }
+  .cta-row { display: flex; align-items: center; gap: 20px; }
+  .cta-text { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+  .cta-text .label { font-weight: 700; color: var(--ink-2); }
+  .cta-text .bot { font-weight: 900; word-break: break-all; }
+  .qr { flex: none; display: flex; align-items: center; justify-content: center; background: var(--paper); border-radius: 14px; }
+  .qr svg { display: block; width: 100%; height: 100%; }
+  [data-anim] { opacity: 0; }
+</style>
+</head>
+<body>
+<script src="art.js"></script>
+
+<div class="stage">
+  <svg class="art" width="1080" height="1920" viewBox="0 0 1080 1920" aria-hidden="true">
+    <rect width="1080" height="1920" filter="url(#mottle)" opacity="0.35"></rect>
+    <g filter="url(#rough)">
+      <g id="page" data-anim>
+        <path d="M-60 778 L0 770 C 220 720, 420 780, 620 740 S 940 680, 1080 725 L1140 718 L1140 1478 L1080 1470 C 860 1520, 640 1450, 440 1495 S 120 1540, 0 1500 L-60 1494 Z" fill="#F3E9D9"></path>
+        <path d="M-60 800 L0 792 C 220 742, 420 802, 620 762 S 940 702, 1080 747 L1140 740 L1140 1498 L1080 1490 C 860 1540, 640 1470, 440 1515 S 120 1560, 0 1520 L-60 1514 Z" fill="#FFFDF8"></path>
+      </g>
+    </g>
+    <g filter="url(#rough)">
+      <g id="phone-wrap" data-anim>
+        <g transform="translate(0 16)"><g transform="matrix(0.693 0.4 -0.693 0.4 644 860)"><rect width="340" height="640" rx="44" fill="#C9BFAF"></rect></g></g>
+        <g transform="matrix(0.693 0.4 -0.693 0.4 644 860)">
+          <use href="#phone"></use>
+          <!-- 蓋住走勢圖，往右縮掉時圖就從左到右畫出來 -->
+          <rect id="chart-cover" x="58" y="238" width="224" height="150" rx="12" fill="#FFFDF8"></rect>
+        </g>
+      </g>
+      <g id="walker-a" data-anim data-x="388" data-y="1150"><use href="#person-a"></use></g>
+      <g id="bar-1" data-anim data-x="150" data-y="1330"><use href="#bar"></use></g>
+      <g id="bar-2" data-anim data-x="98" data-y="1360"><use href="#bar"></use></g>
+      <g id="bar-3" data-anim data-x="124" data-y="1302"><use href="#bar"></use></g>
+      <g id="coin-1" data-anim data-x="620" data-y="1380"><use href="#coin"></use></g>
+      <g id="coin-2" data-anim data-x="690" data-y="1418"><use href="#coin"></use></g>
+      <g id="coin-3" data-anim data-x="690" data-y="1408"><use href="#coin"></use></g>
+      <g id="walker-b" data-anim data-x="900" data-y="1330"><use href="#person-b"></use></g>
+      <g id="coin-4" data-anim data-x="1000" data-y="1200"><use href="#coin"></use></g>
+    </g>
+    <g id="mark-1" data-anim data-x="110" data-y="296" filter="url(#soft)"><use href="#mark-up"></use></g>
+    <g id="mark-2" data-anim data-x="900" data-y="250" filter="url(#soft)"><use href="#mark-zig"></use></g>
+    <g id="coin-5" data-anim data-x="960" data-y="1640"><use href="#coin-light"></use></g>
+    <g id="coin-6" data-anim data-x="110" data-y="1700"><use href="#coin-light"></use></g>
+    <rect width="1080" height="1920" filter="url(#grain-dark)" opacity="0.5"></rect>
+    <rect width="1080" height="1920" filter="url(#grain-light)" opacity="0.45"></rect>
+  </svg>
+
+  <!-- logo：開場時放大在畫面中間一筆一畫寫出來，再縮到上方 -->
+  <div id="logo-wrap" style="position: absolute; left: 392px; top: 104px; width: 296px; height: 172px; transform-origin: 50% 50%">
+    <svg width="296" height="172" viewBox="0 0 370 215" role="img" aria-label="Gold Daily" style="display: block; overflow: visible">
+      <g fill="none" stroke="#231815" stroke-width="26" stroke-linecap="round" stroke-linejoin="round">
+        <path id="lg-g" d="M76.2 23.8 A37 37 0 1 0 87 50 L60 50"></path>
+        <path id="lg-l" d="M226 13 V87 H272"></path>
+        <path id="lg-d" d="M304 13 V87 H320 A37 37 0 0 0 320 13 Z"></path>
+      </g>
+      <g id="lg-o">
+        <circle cx="158" cy="50" r="40" fill="#FFFDF8" stroke="#231815" stroke-width="12"></circle>
+        <circle cx="158" cy="50" r="12" fill="#231815"></circle>
+      </g>
+      <text id="lg-daily" x="370" y="160" text-anchor="end" font-family="'Cormorant Garamond', serif" font-style="italic" font-weight="700" font-size="74" fill="#231815">daily</text>
+      <rect id="lg-line-1" x="14" y="196" width="100" height="3" fill="#231815"></rect>
+      <rect id="lg-line-2" x="256" y="196" width="100" height="3" fill="#231815"></rect>
+      <text id="lg-zh" x="190" y="206" text-anchor="middle" font-family="'Noto Serif TC', serif" font-weight="700" font-size="24" letter-spacing="10" fill="#231815">每日金價</text>
+    </svg>
+  </div>
+
+  <h1 class="h" style="left: 0; right: 0; top: 330px; text-align: center">
+    <span id="hl-1" data-anim style="display: inline-block; font-size: 132px; transform-origin: 50% 80%"><span id="hl-mark" class="mark">早安</span>，</span><br>
+    <span id="hl-2" data-anim style="display: inline-block; font-size: 96px">今天的金價來囉。</span>
+  </h1>
+  <p id="sub" data-anim class="sub" style="left: 0; right: 0; top: 630px; text-align: center; font-size: 32px">每個交易日早上九點，國際金價自動送到你的 Telegram。</p>
+
+  <div class="cta" style="left: 0; right: 0; top: 1588px; align-items: center">
+    <div class="more">
+      <span id="cta-word" data-anim class="en" style="font-size: 56px; line-height: 1">Subscribe</span>
+      <div id="pen-wrap" style="width: 0; overflow: hidden"><svg width="240" height="40" viewBox="0 0 250 40" aria-hidden="true" style="display: block"><use href="#pen-line"></use></svg></div>
+    </div>
+    <div class="cta-row">
+      <div id="qr" data-anim class="qr" data-qr style="width: 170px; height: 170px; padding: 12px"></div>
+      <div id="cta-text" data-anim class="cta-text">
+        <span class="label" style="font-size: 26px">Telegram 搜尋</span>
+        <span class="bot" style="font-size: 38px" data-bot></span>
+        <span class="label" style="font-size: 24px">按「開始」免費訂閱・/stop 隨時取消</span>
+      </div>
+    </div>
+  </div>
+  <p id="note" data-anim class="note" style="left: 0; right: 0; bottom: 34px; text-align: center; font-size: 20px">每個交易日 09:00（台灣時間）推播・價格僅供參考，不構成投資建議</p>
+</div>
+
+<script>
+  /** 影片長度（秒） */
+  const DURATION = 12;
+
+  // 注意：畫面上的 id 不能跟 art.js 的圖形定義（bar、coin、person-a…）重複，否則會改到定義本身
+  const $ = (id) => document.getElementById(id);
+  /** t 在 a～b 之間的進度 0～1 */
+  const prog = (t, a, b) => Math.min(1, Math.max(0, (t - a) / (b - a)));
+  const ease = {
+    out: (x) => 1 - Math.pow(1 - x, 3),
+    inOut: (x) => (x < 0.5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2),
+    back: (x) => { const c1 = 1.9, c3 = c1 + 1; return x === 0 ? 0 : 1 + c3 * Math.pow(x - 1, 3) + c1 * Math.pow(x - 1, 2); },
+  };
+
+  // 寫字動畫要用到的筆畫長度
+  const strokes = {};
+  function prepare() {
+    for (const id of ['lg-g', 'lg-l', 'lg-d']) {
+      const el = $(id);
+      strokes[id] = el.getTotalLength();
+      el.style.strokeDasharray = `${strokes[id]}`;
+    }
+  }
+
+  /** 筆畫依進度畫出來（還沒開始時整個藏起來，避免圓頭留下一個點） */
+  function draw(id, p) {
+    const el = $(id);
+    el.style.strokeDashoffset = `${strokes[id] * (1 - p)}`;
+    el.style.opacity = p > 0 ? '1' : '0';
+  }
+
+  /** SVG 群組：以 data-x／data-y 為基準位置，再加上位移與縮放（縮放以基準點為中心，例如小人的腳底） */
+  function place(id, { dx = 0, dy = 0, s = 1, o = 1 } = {}) {
+    const el = $(id);
+    el.setAttribute('transform', `translate(${+el.dataset.x + dx} ${+el.dataset.y + dy}) scale(${Math.max(s, 0.0001)})`);
+    el.style.opacity = `${o}`;
+  }
+
+  /** 從上方掉下來、落地時稍微回彈 */
+  function drop(id, t, start, height = 260) {
+    const p = prog(t, start, start + 0.45);
+    place(id, { dy: -height * (1 - ease.back(p)), o: Math.min(1, p * 4) });
+  }
+
+  /** 從 0 彈出來 */
+  function pop(id, t, start, extra = {}) {
+    const p = prog(t, start, start + 0.45);
+    place(id, { s: ease.back(p), o: Math.min(1, p * 4), ...extra });
+  }
+
+  function fade(id, t, start, { y = 30, dur = 0.45 } = {}) {
+    const p = ease.out(prog(t, start, start + dur));
+    const el = $(id);
+    el.style.opacity = `${p}`;
+    el.style.transform = `translateY(${y * (1 - p)}px)`;
+  }
+
+  window.renderAt = function renderAt(t) {
+    // 手繪毛邊每 1/8 秒換一次，看起來像手繪動畫；紙張顆粒也跟著閃動
+    document.querySelector('#rough feTurbulence').setAttribute('seed', String([3, 10, 17][Math.floor(t * 8) % 3]));
+    document.querySelector('#grain-dark feTurbulence').setAttribute('seed', String(4 + (Math.floor(t * 12) % 4)));
+
+    // 0～2.4 秒：logo 寫出來（G → 金幣 O 掉下來 → L → D → daily → 每日金價）
+    draw('lg-g', ease.out(prog(t, 0.3, 0.85)));
+    const o = prog(t, 0.55, 1.05);
+    $('lg-o').setAttribute('transform', `translate(0 ${-180 * (1 - ease.back(o))})`);
+    $('lg-o').style.opacity = `${Math.min(1, o * 4)}`;
+    draw('lg-l', ease.out(prog(t, 0.8, 1.1)));
+    draw('lg-d', ease.out(prog(t, 0.95, 1.35)));
+    const daily = ease.out(prog(t, 1.3, 1.7));
+    $('lg-daily').style.opacity = `${daily}`;
+    $('lg-daily').setAttribute('transform', `translate(${30 * (1 - daily)} 0)`);
+    const line = ease.out(prog(t, 1.6, 1.95));
+    $('lg-line-1').setAttribute('transform', `translate(${114 * (1 - line)} 0) scale(${line} 1)`);
+    $('lg-line-2').setAttribute('transform', `translate(${256 * (1 - line)} 0) scale(${line} 1)`);
+    $('lg-zh').style.opacity = `${ease.out(prog(t, 1.7, 2.0))}`;
+    // 2.4～3.0 秒：縮到上方
+    const m = ease.inOut(prog(t, 2.4, 3.0));
+    $('logo-wrap').style.transform = `translateY(${670 * (1 - m)}px) scale(${2.5 - 1.5 * m})`;
+
+    // 3.0 秒起：標題
+    const h1 = prog(t, 3.0, 3.45);
+    $('hl-1').style.opacity = `${Math.min(1, h1 * 3)}`;
+    $('hl-1').style.transform = `scale(${0.6 + 0.4 * ease.back(h1)})`;
+    $('hl-mark').style.backgroundSize = `${100 * ease.out(prog(t, 3.35, 3.7))}% 100%`;
+    fade('hl-2', t, 3.55, { y: 40 });
+    fade('sub', t, 3.95, { y: 20 });
+    const float = 6 * Math.sin(t * Math.PI);
+    pop('mark-1', t, 2.95, { dy: float });
+    pop('mark-2', t, 3.05, { dy: -float });
+
+    // 4.3～5.0 秒：紙張滑上來；手機落下；走勢圖畫出來
+    const page = ease.inOut(prog(t, 4.3, 5.0));
+    $('page').setAttribute('transform', `translate(0 ${900 * (1 - page)})`);
+    $('page').style.opacity = page > 0 ? '1' : '0';
+    const phone = ease.out(prog(t, 5.0, 5.6));
+    $('phone-wrap').setAttribute('transform', `translate(0 ${-80 * (1 - phone)})`);
+    $('phone-wrap').style.opacity = `${phone}`;
+    const chart = ease.inOut(prog(t, 5.6, 6.6));
+    $('chart-cover').setAttribute('x', `${58 + 224 * chart}`);
+    $('chart-cover').setAttribute('width', `${224 * (1 - chart)}`);
+    pop('walker-a', t, 6.0);
+
+    // 6.5 秒起：金條一根根掉下來、金幣掉下來；舉金條的小人跳出來，之後輕輕跳動
+    drop('bar-1', t, 6.5);
+    drop('bar-2', t, 6.7);
+    drop('bar-3', t, 6.9, 320);
+    drop('coin-1', t, 7.2, 160);
+    drop('coin-2', t, 7.3, 160);
+    drop('coin-3', t, 7.4, 180);
+    drop('coin-4', t, 7.5, 160);
+    const hop = t > 8.1 ? -10 * Math.abs(Math.sin((t - 8.1) * Math.PI * 1.6)) : 0;
+    pop('walker-b', t, 7.6, { dy: hop });
+
+    // 8.3 秒起：訂閱資訊
+    fade('cta-word', t, 8.3, { y: 20 });
+    $('pen-wrap').style.width = `${240 * ease.inOut(prog(t, 8.5, 9.1))}px`;
+    const qr = prog(t, 8.7, 9.15);
+    $('qr').style.opacity = `${Math.min(1, qr * 3)}`;
+    $('qr').style.transform = `scale(${ease.back(qr)})`;
+    fade('cta-text', t, 8.9, { y: 20 });
+    pop('coin-5', t, 9.0, { dy: 4 * Math.sin(t * 2) });
+    pop('coin-6', t, 9.1, { dy: -4 * Math.sin(t * 2) });
+    fade('note', t, 9.3, { y: 0 });
+  };
+
+  (async () => {
+    GOLD_DAILY.fillBotAndQr();
+    await document.fonts.ready;
+    prepare();
+    renderAt(0);
+    const render = new URLSearchParams(location.search).has('render');
+    if (render) {
+      document.body.classList.add('render');
+      window.__ready = true;
+      return;
+    }
+    // 預覽：循環播放（結尾多停 1 秒）
+    const start = performance.now();
+    const loop = (now) => {
+      renderAt(((now - start) / 1000) % (DURATION + 1));
+      requestAnimationFrame(loop);
+    };
+    requestAnimationFrame(loop);
+  })();
+</script>
+</body>
+</html>

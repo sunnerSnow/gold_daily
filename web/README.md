@@ -191,7 +191,12 @@ Telegram 的收件人有兩種：
 
 目前的 bot 是 [@GoldEchoBot](https://t.me/GoldEchoBot)，訂閱連結 `https://t.me/GoldEchoBot`。
 
-推廣圖與 logo 的原始檔是 `../design/promo/promo.html`（風格參考 [nsl-jp.com](https://www.nsl-jp.com/)），在專案根目錄執行 `bash design/promo/render.sh` 會用本機的 Chrome 輸出 PNG 到 `design/promo/png/`（需要網路載入字型與 QR code 函式庫；圖檔不進版控）。換 bot 時改 `promo.html` 最後的 `const BOT = 'GoldEchoBot'`，名稱與 QR code 會一起更新。各張圖的尺寸與用途見[專案首頁的 README](../README.md#推廣素材)。
+推廣圖與 logo 的原始檔是 `../design/promo/promo.html`，推廣影片是 `../design/promo/video.html`，兩者共用 `../design/promo/art.js`（logo、插畫、紙張質感濾鏡與 bot 名稱）。在專案根目錄執行：
+
+- `bash design/promo/render.sh`：用本機的 Chrome 輸出 PNG 到 `design/promo/png/`
+- `node design/promo/render-video.mjs`：逐格截圖後用 ffmpeg 合成 MP4 到 `design/promo/out/`（1080×1920、12 秒、30 fps，約 3 分鐘）
+
+兩者都需要網路載入字型與 QR code 函式庫；圖檔與影片不進版控。換 bot 時改 `art.js` 的 `bot: 'GoldEchoBot'`，圖與影片的名稱、QR code 會一起更新。各檔案的尺寸與用途見[專案首頁的 README](../README.md#推廣素材)。
 
 網站用的 logo 也從這裡輸出，改了 logo 要重新複製：
 

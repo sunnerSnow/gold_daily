@@ -77,7 +77,7 @@
 
 ### 推廣素材
 
-風格參考 [nsl-jp.com](https://www.nsl-jp.com/)：芥末黃紙紋底、奶油色書頁、扁平手繪小人、明朝體大標。原始檔是 [`design/promo/promo.html`](design/promo/promo.html)（用瀏覽器打開可以一次預覽全部），執行 `bash design/promo/render.sh` 會用本機的 Chrome 輸出 PNG 到 `design/promo/png/`（圖檔不進版控，需要時重新產生）。
+風格：芥末黃紙紋底、奶油色書頁、扁平手繪小人、明朝體大標。圖的原始檔是 [`design/promo/promo.html`](design/promo/promo.html)、影片是 [`design/promo/video.html`](design/promo/video.html)（都可以直接用瀏覽器打開預覽），logo 與插畫共用 [`design/promo/art.js`](design/promo/art.js)。執行 `bash design/promo/render.sh` 會用本機的 Chrome 輸出 PNG 到 `design/promo/png/`；`node design/promo/render-video.mjs` 輸出影片到 `design/promo/out/`（需要 ffmpeg）。圖檔與影片都不進版控，需要時重新產生。
 
 | 輸出檔 | 尺寸 | 用途 | Slogan |
 |---|---|---|---|
@@ -87,8 +87,11 @@
 | `avatar.png` | 640×640 | Telegram bot 大頭貼 | — |
 | `intro.png` | 640×360 | Telegram bot 介紹圖（還沒按「開始」時看到） | 金金計較，天天報到。 |
 | `logo-clear.png`、`logo-mustard.png` | — | logo（透明底、芥末底） | — |
+| `out/gold-daily-story.mp4` | 1080×1920，12 秒 | 限時動態、Reels、Telegram／LINE 影片（無聲，可在發文時加音樂） | 早安，今天的金價來囉。 |
 
-貼文、限時動態與橫幅都附 `@GoldEchoBot` 與訂閱 QR code（連到 `https://t.me/GoldEchoBot`），也都註明「價格僅供參考，不構成投資建議」。備選 slogan：「讓金價自己來找你」「漲了跌了，第一個告訴你」「每天一則，金價心裡有數」。bot 的大頭貼、介紹圖與說明文字怎麼設定，見 [web/README.md 的 Telegram 設定](web/README.md#推廣素材與-bot-設定)。
+影片的順序：logo 一筆一畫寫出來（金幣 O 從上方掉下來）→ 縮到上方、標題跳出 → 紙張滑上來、手機落下、走勢圖畫出來 → 小人出現、金條一根根掉下來疊好 → Subscribe、`@GoldEchoBot` 與 QR code。插畫的毛邊會輕微晃動，像手繪動畫；最後一格跟 `story.png` 一樣。
+
+貼文、限時動態、橫幅與影片都附 `@GoldEchoBot` 與訂閱 QR code（連到 `https://t.me/GoldEchoBot`），也都註明「價格僅供參考，不構成投資建議」。備選 slogan：「讓金價自己來找你」「漲了跌了，第一個告訴你」「每天一則，金價心裡有數」。bot 的大頭貼、介紹圖與說明文字怎麼設定，見 [web/README.md 的 Telegram 設定](web/README.md#推廣素材與-bot-設定)。
 
 ---
 
@@ -200,7 +203,7 @@ gold-daily/
 │   ├── src/lib/    行情來源、排程工作、LINE、Telegram、資料存取、額度保護
 │   └── supabase/   資料表 migration 與 pg_cron 排程 SQL
 ├── design/         視覺設計稿（純 HTML，直接用瀏覽器開 design/index.html）
-│   └── promo/      logo 與推廣圖原始檔、輸出腳本（PNG 輸出到 png/，不進版控）
+│   └── promo/      logo、推廣圖與推廣影片的原始檔、輸出腳本（輸出到 png/、out/，不進版控）
 └── docs/images/    README 的截圖
 ```
 

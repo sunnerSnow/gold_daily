@@ -6,5 +6,6 @@ node_modules/
 .DS_Store
 Thumbs.db
 
-# 推廣圖輸出（用 design/promo/render.sh 隨時重新產生）
+# 推廣圖與影片輸出（用 design/promo/render.sh、render-video.mjs 隨時重新產生）
 design/promo/png/
+design/promo/out/
