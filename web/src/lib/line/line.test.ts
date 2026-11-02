@@ -354,6 +354,27 @@ describe('其他推播訊息', () => {
     expect(text.split('\n').slice(0, 2)).toEqual(['🎯 黃金到價提醒', '國際現貨黃金']);
     expect(text).toContain('目標價格：4,200.00 USD（漲到以上）');
     expect(text).toContain('備註：加碼');
+    expect(text).not.toContain('同時達到');
+    expect(text).toContain('這個目標價已自動關閉');
+  });
+
+  it('到價提醒列出同時達到、一起關閉的目標價', () => {
+    const text = formatTargetMessage({
+      direction: 'below',
+      price: 3894,
+      targetPrice: 3900,
+      alsoReached: [4000, 4100.5],
+      symbol: 'XAUUSD',
+      currency: 'USD',
+      unit: 'troy_oz',
+      timestamp: new Date('2026-10-14T13:30:00Z'),
+      source: 'goldapi',
+      status: 'valid',
+      note: null,
+    });
+    expect(text).toContain('目標價格：3,900.00 USD（跌到以下）');
+    expect(text).toContain('同時達到：4,000.00、4,100.50 USD');
+    expect(text).toContain('以上目標價都已自動關閉');
   });
 
   it('測試推播提到後面接著的卡片', () => {

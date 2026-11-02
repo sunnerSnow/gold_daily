@@ -242,6 +242,47 @@ describe('到價提醒', () => {
     expect(w.line.pushes.filter((p) => p.text.includes('黃金到價提醒'))).toHaveLength(1);
   });
 
+  it('同方向好幾個目標價一起達到時，只推最接近目前價格的那一個，其他一併關閉', async () => {
+    // 跌到以下：1,000,000 與 2,000,000 都達到 → 只推 1,000,000；1 還沒到
+    const w = createWorld(TUE_0900);
+    await w.store.updateSettings({ intradayMode: 'interval', pollingIntervalMinutes: 15 });
+    for (const targetPrice of [1, 2_000_000, 1_000_000]) {
+      await w.store.insertPriceTarget({ ...MOCK_KEY, direction: 'below', targetPrice, note: null });
+    }
+    const r = await runIntradayJob(w.deps(), { trigger: 'cron' });
+    expect(r.detail).toContain('≤ 1000000，一併關閉 2000000');
+    const pushes = w.line.pushes.filter((p) => p.text.includes('黃金到價提醒'));
+    expect(pushes).toHaveLength(1);
+    expect(pushes[0].text).toContain('目標價格：1,000,000.00 USD（跌到以下）');
+    expect(pushes[0].text).toContain('同時達到：2,000,000.00 USD');
+    const byPrice = new Map((await w.store.listPriceTargets({ limit: 5 })).map((t) => [t.targetPrice, t]));
+    expect(byPrice.get(1_000_000)?.status).toBe('triggered');
+    expect(byPrice.get(2_000_000)?.status).toBe('triggered');
+    expect(byPrice.get(2_000_000)?.eventId).toBe(byPrice.get(1_000_000)?.eventId);
+    expect(byPrice.get(1)?.status).toBe('active');
+    // 下一輪不會再補推被一併關閉的 2,000,000
+    w.clock.advanceMinutes(15);
+    await runIntradayJob(w.deps(), { trigger: 'cron' });
+    expect(w.line.pushes.filter((p) => p.text.includes('黃金到價提醒'))).toHaveLength(1);
+  });
+
+  it('漲到以上也一樣推最接近的（目標價最高的）；不同方向各推各的', async () => {
+    const w = createWorld(TUE_0900);
+    await w.store.insertPriceTarget({ ...MOCK_KEY, direction: 'above', targetPrice: 1, note: null });
+    await w.store.insertPriceTarget({ ...MOCK_KEY, direction: 'above', targetPrice: 2, note: '最接近' });
+    await w.store.insertPriceTarget({ ...MOCK_KEY, direction: 'below', targetPrice: 1_000_000, note: null });
+    await runIntradayJob(w.deps(), { trigger: 'manual' });
+    const pushes = w.line.pushes.filter((p) => p.text.includes('黃金到價提醒'));
+    expect(pushes).toHaveLength(2);
+    const above = pushes.find((p) => p.text.includes('漲到以上'));
+    expect(above?.text).toContain('目標價格：2.00 USD（漲到以上）');
+    expect(above?.text).toContain('同時達到：1.00 USD');
+    expect(above?.text).toContain('備註：最接近');
+    const below = pushes.find((p) => p.text.includes('跌到以下'));
+    expect(below?.text).not.toContain('同時達到');
+    expect((await w.store.listPriceTargets({ statuses: ['active'], limit: 5 }))).toHaveLength(0);
+  });
+
   it('還沒到價、或不同商品的目標價不觸發', async () => {
     const w = createWorld(TUE_0900);
     await w.store.insertPriceTarget({ ...MOCK_KEY, direction: 'below', targetPrice: 1000, note: null });

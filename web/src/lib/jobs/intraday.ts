@@ -5,7 +5,7 @@ import { ensureBaseline, evaluateAndNotify } from './alerts';
 import { safeErrorMessage, type JobDeps, type JobOutcome } from './deps';
 import { describeEvent } from './daily';
 import { fetchAndRecord } from './snapshot';
-import { evaluateTargets } from './targets';
+import { describeTargetHit, evaluateTargets } from './targets';
 
 // 盤中檢查：跟每日推播是不同的工作。排程每 15 分鐘呼叫一次，這裡依設定（固定時間或固定間隔）
 // 決定要不要真的查價；查到的價格同時判斷百分比異動提醒與到價提醒。
@@ -74,7 +74,7 @@ export async function runIntradayJob(deps: JobDeps, options: { trigger: JobTrigg
 
     for (const t of await evaluateTargets(deps, settings, quote, instrument)) {
       eventIds.push(t.event.id);
-      parts.push(`到價提醒（${t.target.direction === 'above' ? '≥' : '≤'} ${t.target.targetPrice}）：${describeEvent(t.event)}`);
+      parts.push(`到價提醒（${describeTargetHit(t)}）：${describeEvent(t.event)}`);
     }
 
     const detail = parts.join('；');

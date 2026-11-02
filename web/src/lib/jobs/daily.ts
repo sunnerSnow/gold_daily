@@ -9,7 +9,7 @@ import { safeErrorMessage, type JobDeps, type JobOutcome } from './deps';
 import { CARD_DROPPED_NOTE, deliverEvent, deliveryFailure, MAX_TOTAL_ATTEMPTS, PHOTO_DROPPED_NOTE, RECOVERABLE_SKIPS } from './notify';
 import { getProviderBudget, meteredCall } from './provider-usage';
 import { fetchAndRecord } from './snapshot';
-import { evaluateTargets } from './targets';
+import { describeTargetHit, evaluateTargets } from './targets';
 
 // 每日行情：取得報價 → 驗證 → 存快照 → 找前一交易日參考價 → 計算漲跌 → 推播 → 記錄結果。
 // 同一天重跑不會產生第二筆每日快照，也不會重複推播（事件鍵 daily:YYYY-MM-DD）。
@@ -244,7 +244,7 @@ export async function runDailyJob(deps: JobDeps, options: DailyOptions): Promise
       }
       for (const t of await evaluateTargets(deps, fresh, quote, instrument)) {
         eventIds.push(t.event.id);
-        detailParts.push(`到價提醒（${t.target.direction === 'above' ? '≥' : '≤'} ${t.target.targetPrice}）：${describeEvent(t.event)}`);
+        detailParts.push(`到價提醒（${describeTargetHit(t)}）：${describeEvent(t.event)}`);
       }
     }
 

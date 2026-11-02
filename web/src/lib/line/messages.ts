@@ -178,6 +178,8 @@ export interface TargetMessageInput {
   direction: 'above' | 'below';
   price: number;
   targetPrice: number;
+  /** 同一次一起達到、跟著關閉的其他目標價（同方向） */
+  alsoReached?: number[];
   symbol: string;
   currency: string;
   unit: PriceUnit;
@@ -188,16 +190,18 @@ export interface TargetMessageInput {
 }
 
 export function formatTargetMessage(i: TargetMessageInput): string {
+  const also = i.alsoReached ?? [];
   return [
     `${mockFlag(i.status)}🎯 黃金到價提醒`,
     instrumentName(i),
     '',
     `目前價格：${formatPriceWithUnit(i.price, i.currency, i.unit)}`,
     `目標價格：${formatPrice(i.targetPrice)} ${i.currency}（${i.direction === 'above' ? '漲到以上' : '跌到以下'}）`,
+    ...(also.length > 0 ? [`同時達到：${also.map((p) => formatPrice(p)).join('、')} ${i.currency}`] : []),
     ...(i.note ? [`備註：${i.note}`] : []),
     `報價時間：${formatTaipei(i.timestamp)}`,
     `資料來源：${describeSource(i.source, i.status)}`,
-    '這個目標價已自動關閉，需要時請重新設定。',
+    also.length > 0 ? '以上目標價都已自動關閉，需要時請重新設定。' : '這個目標價已自動關閉，需要時請重新設定。',
     '',
     ...CHART_LINK,
   ].join('\n');

@@ -68,7 +68,7 @@ export function PriceTargetsCard({
         ) : null}
       </div>
       <p className="help">
-        價格漲到（或跌到）目標價時送一則 LINE，送出後這個目標價自動關閉。{checkSummary}
+        價格漲到（或跌到）目標價時送一則 LINE，送出後這個目標價自動關閉。同一次查價有好幾個目標價都達到時，只推最接近目前價格的那一個，其他的一併關閉。{checkSummary}
       </p>
 
       <form
