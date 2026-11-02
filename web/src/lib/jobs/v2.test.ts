@@ -8,8 +8,8 @@ import { DEFAULT_SETTINGS } from '../store/types';
 import { runDailyJob } from './daily';
 import { runIntradayJob } from './intraday';
 import { backfillHistory } from './maintenance';
-import { isTargetHit } from './targets';
-import { createWorld, LimitedMockProvider } from './test-helpers';
+import { isTargetHit } from './target-hits';
+import { createWorld, LimitedMockProvider, type TestWorld } from './test-helpers';
 
 // 第 2 版功能：GoldAPI、查價次數保護、固定時間查價、週末不推播、到價提醒。
 
@@ -110,12 +110,13 @@ describe('查價次數保護', () => {
     expect(computeProviderBudget({ monthlyQuota: null, used: 999, remainingDailyRuns: 30 })).toMatchObject({ limited: false, canDaily: true, canExtra: true });
   });
 
-  it('本月剩餘每日推播次數：週末不推播時只算平日', () => {
+  it('本月剩餘每日推播次數：週末不推播時只算平日，開了週六推播再加上週六', () => {
     const tue = new Date(TUE_0900);
-    // 10/13（含）到 10/31 的平日共 14 天
-    expect(remainingDailyRuns(tue, { dailyEnabled: true, skipWeekends: true, dailyDoneToday: false })).toBe(14);
-    expect(remainingDailyRuns(tue, { dailyEnabled: true, skipWeekends: true, dailyDoneToday: true })).toBe(13);
-    expect(remainingDailyRuns(tue, { dailyEnabled: true, skipWeekends: false, dailyDoneToday: false })).toBe(19);
+    // 10/13（含）到 10/31 的平日共 14 天，週六 3 天（10/17、10/24、10/31）
+    expect(remainingDailyRuns(tue, { dailyEnabled: true, skipWeekends: true, saturdayPush: false, dailyDoneToday: false })).toBe(14);
+    expect(remainingDailyRuns(tue, { dailyEnabled: true, skipWeekends: true, saturdayPush: false, dailyDoneToday: true })).toBe(13);
+    expect(remainingDailyRuns(tue, { dailyEnabled: true, skipWeekends: true, saturdayPush: true, dailyDoneToday: false })).toBe(17);
+    expect(remainingDailyRuns(tue, { dailyEnabled: true, skipWeekends: false, saturdayPush: false, dailyDoneToday: false })).toBe(19);
   });
 
   it('每次呼叫都記錄；10 分鐘內查過就沿用，不再呼叫', async () => {
@@ -194,13 +195,28 @@ describe('固定時間查價與週末', () => {
     expect(intradayDue(s, new Date('2026-10-13T13:45:00Z'), new Date('2026-10-13T13:31:00Z'))).toMatchObject({ due: false, reason: '這個時段已經檢查過' });
   });
 
-  it('週末不查價、不推播', async () => {
+  it('週末不做盤中檢查；週日不推播，週六推播關掉時週六也不推', async () => {
     expect(isTaipeiWeekend(new Date('2026-10-17T02:00:00Z'))).toBe(true); // 週六
     expect(isTaipeiWeekend(new Date('2026-10-16T15:59:00Z'))).toBe(false); // 週五 23:59
     expect(intradayDue(s, new Date('2026-10-17T13:31:00Z'), null)).toMatchObject({ due: false, reason: '週末休市，不查價' });
-    const w = createWorld('2026-10-17T01:00:00Z'); // 週六 09:00
-    expect((await runDailyJob(w.deps(), { trigger: 'cron' })).status).toBe('disabled');
-    expect(w.line.pushes).toHaveLength(0);
+    const sun = createWorld('2026-10-18T01:00:00Z'); // 週日 09:00
+    expect((await runDailyJob(sun.deps(), { trigger: 'cron' })).status).toBe('disabled');
+    const sat = createWorld('2026-10-17T01:00:00Z'); // 週六 09:00
+    await sat.store.updateSettings({ saturdayPush: false });
+    expect((await runDailyJob(sat.deps(), { trigger: 'cron' })).status).toBe('disabled');
+    expect([...sun.line.pushes, ...sat.line.pushes]).toHaveLength(0);
+  });
+
+  it('週六推播：送當週收盤價（週五美國盤，雖然超過 30 分鐘沒更新也不算過期），到價也會判斷', async () => {
+    const w = createWorld('2026-10-17T01:00:00Z'); // 週六 09:00（收盤後約 4 小時）
+    await w.store.insertPriceTarget({ ...MOCK_KEY, direction: 'above', targetPrice: 1000, note: null });
+    const r = await runDailyJob(w.deps(), { trigger: 'cron' });
+    expect(r.status).toBe('success');
+    const card = JSON.stringify(w.line.pushes.find((p) => p.card)?.card ?? null);
+    expect(card).toContain('2026/10/17（六）');
+    expect(card).toContain('🎯 已達目標價 1,000.00 USD（漲到以上）');
+    expect(card).not.toContain('過期');
+    expect(await w.store.getDailySnapshot(MOCK_KEY, '2026-10-17')).not.toBeNull();
   });
 
   it('下一次查價時間會跳過週末', () => {
@@ -211,7 +227,8 @@ describe('固定時間查價與週末', () => {
   it('解析檢查時間與估算每月查價次數', () => {
     expect(parseCheckTimes('21:30, 9:00')).toEqual(['09:00', '21:30']);
     expect(parseCheckTimes('25:00')).toBeNull();
-    expect(estimateMonthlyCalls({ ...s, checkTimes: ['21:30'] })).toBe(44); // 22 天 × (每日 1 + 21:30)
+    expect(estimateMonthlyCalls({ ...s, checkTimes: ['21:30'], saturdayPush: false })).toBe(44); // 22 天 × (每日 1 + 21:30)
+    expect(estimateMonthlyCalls({ ...s, checkTimes: ['21:30'], saturdayPush: true })).toBe(48); // 再加 4 個週六的每日推播
     expect(estimateMonthlyCalls({ ...s, intradayMode: 'interval', pollingIntervalMinutes: 15 })).toBeGreaterThan(100);
   });
 });
@@ -226,61 +243,77 @@ describe('到價提醒', () => {
     expect(isTargetHit({ direction: 'below', targetPrice: 4000 }, 4000.01)).toBe(false);
   });
 
-  it('漲到目標價時送一則提醒並自動關閉，之後不會再送', async () => {
+  /** 每日推播的卡片內容（JSON）；index 預設取最後一張 */
+  const dailyCard = (w: TestWorld, index = -1) => JSON.stringify(w.line.pushes.filter((p) => p.card).at(index)?.card ?? null);
+  /** 單獨推送的到價提醒 */
+  const targetPushes = (w: TestWorld) => w.line.pushes.filter((p) => p.text.includes('黃金到價提醒'));
+
+  it('到價寫在當天的每日推播裡，不另外推；目標價自動關閉，隔天不會再出現', async () => {
     const w = createWorld(TUE_0900);
-    await w.store.updateSettings({ intradayMode: 'interval', pollingIntervalMinutes: 15 });
+    w.telegram.configured = true;
     await w.store.insertPriceTarget({ ...MOCK_KEY, direction: 'above', targetPrice: 1000, note: '測試' });
-    await runIntradayJob(w.deps(), { trigger: 'cron' });
+    const r = await runDailyJob(w.deps(), { trigger: 'cron' });
+    expect(r.detail).toContain('到價提醒（≥ 1000）併入每日推播');
+    expect(targetPushes(w)).toHaveLength(0);
+    const daily = w.line.pushes.find((p) => p.card);
+    expect(daily?.card?.altText).toContain('🎯 已達目標價');
+    expect(dailyCard(w)).toContain('🎯 已達目標價 1,000.00 USD（漲到以上）');
+    expect(dailyCard(w)).toContain('備註：測試');
+    expect(JSON.stringify(w.telegram.sends.map((s) => s.message))).toContain('<b>🎯 已達目標價 1,000.00 USD（漲到以上）</b>');
+    const event = await w.store.getEventByKey('daily:2026-10-13');
+    expect(event?.messageText).toContain('🎯 已達目標價 1,000.00 USD（漲到以上）');
     const [t] = await w.store.listPriceTargets({ limit: 5 });
-    expect(t.status).toBe('triggered');
-    expect(t.eventId).not.toBeNull();
-    const target = w.line.pushes.find((p) => p.text.includes('黃金到價提醒'));
-    expect(target?.text).toContain('目標價格：1,000.00 USD（漲到以上）');
-    expect(target?.text).toContain('備註：測試');
-    w.clock.advanceMinutes(15);
-    await runIntradayJob(w.deps(), { trigger: 'cron' });
-    expect(w.line.pushes.filter((p) => p.text.includes('黃金到價提醒'))).toHaveLength(1);
+    expect(t).toMatchObject({ status: 'triggered', eventId: event!.id });
+    // 隔天的每日推播不會再列
+    w.clock.set('2026-10-14T01:00:00Z');
+    await runDailyJob(w.deps(), { trigger: 'cron' });
+    expect(w.line.pushes.filter((p) => p.card)).toHaveLength(2);
+    expect(dailyCard(w)).not.toContain('🎯');
   });
 
-  it('同方向好幾個目標價一起達到時，只推最接近目前價格的那一個，其他一併關閉', async () => {
-    // 跌到以下：1,000,000 與 2,000,000 都達到 → 只推 1,000,000；1 還沒到
+  it('盤中檢查不判斷到價（每日推播開著時，避免跟每日推播重覆）', async () => {
+    const w = createWorld('2026-10-13T13:31:00Z'); // 21:31
+    await w.store.insertPriceTarget({ ...MOCK_KEY, direction: 'above', targetPrice: 1000, note: null });
+    expect((await runIntradayJob(w.deps(), { trigger: 'cron' })).status).toBe('success');
+    expect(targetPushes(w)).toHaveLength(0);
+    expect((await w.store.listPriceTargets({ limit: 1 }))[0].status).toBe('active');
+  });
+
+  it('同方向好幾個目標價一起達到時，只列最接近目前價格的那一個，其他註明「同時達到」並一起關閉', async () => {
+    // 跌到以下：1,000,000 與 2,000,000 都達到 → 列 1,000,000；1 還沒到。漲到以上：1 與 2 都達到 → 列 2
     const w = createWorld(TUE_0900);
-    await w.store.updateSettings({ intradayMode: 'interval', pollingIntervalMinutes: 15 });
     for (const targetPrice of [1, 2_000_000, 1_000_000]) {
       await w.store.insertPriceTarget({ ...MOCK_KEY, direction: 'below', targetPrice, note: null });
     }
-    const r = await runIntradayJob(w.deps(), { trigger: 'cron' });
-    expect(r.detail).toContain('≤ 1000000，一併關閉 2000000');
-    const pushes = w.line.pushes.filter((p) => p.text.includes('黃金到價提醒'));
-    expect(pushes).toHaveLength(1);
-    expect(pushes[0].text).toContain('目標價格：1,000,000.00 USD（跌到以下）');
-    expect(pushes[0].text).toContain('同時達到：2,000,000.00 USD');
-    const byPrice = new Map((await w.store.listPriceTargets({ limit: 5 })).map((t) => [t.targetPrice, t]));
-    expect(byPrice.get(1_000_000)?.status).toBe('triggered');
-    expect(byPrice.get(2_000_000)?.status).toBe('triggered');
-    expect(byPrice.get(2_000_000)?.eventId).toBe(byPrice.get(1_000_000)?.eventId);
-    expect(byPrice.get(1)?.status).toBe('active');
-    // 下一輪不會再補推被一併關閉的 2,000,000
-    w.clock.advanceMinutes(15);
-    await runIntradayJob(w.deps(), { trigger: 'cron' });
-    expect(w.line.pushes.filter((p) => p.text.includes('黃金到價提醒'))).toHaveLength(1);
-  });
-
-  it('漲到以上也一樣推最接近的（目標價最高的）；不同方向各推各的', async () => {
-    const w = createWorld(TUE_0900);
     await w.store.insertPriceTarget({ ...MOCK_KEY, direction: 'above', targetPrice: 1, note: null });
     await w.store.insertPriceTarget({ ...MOCK_KEY, direction: 'above', targetPrice: 2, note: '最接近' });
+    const r = await runDailyJob(w.deps(), { trigger: 'cron' });
+    expect(r.detail).toContain('到價提醒（≥ 2，一併關閉 1）併入每日推播');
+    expect(r.detail).toContain('到價提醒（≤ 1000000，一併關閉 2000000）併入每日推播');
+    const card = dailyCard(w);
+    expect(card).toContain('🎯 已達目標價 2.00 USD（漲到以上）');
+    expect(card).toContain('同時達到：1.00 USD');
+    expect(card).toContain('備註：最接近');
+    expect(card).toContain('🎯 已達目標價 1,000,000.00 USD（跌到以下）');
+    expect(card).toContain('同時達到：2,000,000.00 USD');
+    expect(card).not.toContain('🎯 已達目標價 1.00 USD');
+    const targets = new Map((await w.store.listPriceTargets({ limit: 10 })).map((t) => [`${t.direction}:${t.targetPrice}`, t]));
+    expect(targets.get('below:1')?.status).toBe('active');
+    for (const key of ['below:1000000', 'below:2000000', 'above:1', 'above:2']) expect(targets.get(key)?.status, key).toBe('triggered');
+  });
+
+  it('LINE 發送失敗後補送：卡片從資料庫重建，到價段落跟原本一樣', async () => {
+    const w = createWorld(TUE_0900);
     await w.store.insertPriceTarget({ ...MOCK_KEY, direction: 'below', targetPrice: 1_000_000, note: null });
-    await runIntradayJob(w.deps(), { trigger: 'manual' });
-    const pushes = w.line.pushes.filter((p) => p.text.includes('黃金到價提醒'));
-    expect(pushes).toHaveLength(2);
-    const above = pushes.find((p) => p.text.includes('漲到以上'));
-    expect(above?.text).toContain('目標價格：2.00 USD（漲到以上）');
-    expect(above?.text).toContain('同時達到：1.00 USD');
-    expect(above?.text).toContain('備註：最接近');
-    const below = pushes.find((p) => p.text.includes('跌到以下'));
-    expect(below?.text).not.toContain('同時達到');
-    expect((await w.store.listPriceTargets({ statuses: ['active'], limit: 5 }))).toHaveLength(0);
+    await w.store.insertPriceTarget({ ...MOCK_KEY, direction: 'below', targetPrice: 2_000_000, note: null });
+    w.line.script = Array.from({ length: 3 }, () => ({ ok: false as const, status: 503, retryable: true, error: 'LINE API 503' }));
+    await runDailyJob(w.deps(), { trigger: 'cron' });
+    w.clock.advanceMinutes(15);
+    const r = await runDailyJob(w.deps(), { trigger: 'cron' });
+    expect(r.detail).toContain('未重新查價');
+    expect(await w.store.getEventByKey('daily:2026-10-13')).toMatchObject({ status: 'sent' });
+    expect(dailyCard(w)).toContain('🎯 已達目標價 1,000,000.00 USD（跌到以下）');
+    expect(dailyCard(w)).toContain('同時達到：2,000,000.00 USD');
   });
 
   it('還沒到價、或不同商品的目標價不觸發', async () => {
@@ -292,14 +325,6 @@ describe('到價提醒', () => {
     expect(targets.every((t) => t.status === 'active')).toBe(true);
   });
 
-  it('每日推播的查價也會檢查到價', async () => {
-    const w = createWorld(TUE_0900);
-    await w.store.insertPriceTarget({ ...MOCK_KEY, direction: 'above', targetPrice: 1000, note: null });
-    const r = await runDailyJob(w.deps(), { trigger: 'cron' });
-    expect(r.detail).toContain('到價提醒');
-    expect((await w.store.listPriceTargets({ limit: 1 }))[0].status).toBe('triggered');
-  });
-
   it('報價過期時不觸發到價', async () => {
     const w = createWorld(TUE_0900);
     await w.store.insertPriceTarget({ ...MOCK_KEY, direction: 'above', targetPrice: 1000, note: null });
@@ -307,20 +332,43 @@ describe('到價提醒', () => {
     expect((await w.store.listPriceTargets({ limit: 1 }))[0].status).toBe('active');
   });
 
-  it('LINE 未連線時目標價仍會關閉，事件記為未發送（可到系統狀態頁重試或重新啟用）', async () => {
+  it('LINE 未連線時目標價仍會關閉，指向未發送的每日推播事件（可到系統狀態頁重試或重新啟用）', async () => {
     const w = createWorld(TUE_0900);
     await w.store.insertPriceTarget({ ...MOCK_KEY, direction: 'above', targetPrice: 1000, note: null });
     await runDailyJob({ ...w.deps(), line: new UnconfiguredLineClient() }, { trigger: 'cron' });
     const [t] = await w.store.listPriceTargets({ limit: 1 });
     expect(t.status).toBe('triggered');
-    expect(await w.store.getEvent(t.eventId!)).toMatchObject({ eventType: 'target', status: 'skipped', skipReason: 'line_not_configured' });
+    expect(await w.store.getEvent(t.eventId!)).toMatchObject({ eventType: 'daily', status: 'skipped', skipReason: 'line_not_configured' });
   });
 
-  it('只有到價提醒（百分比提醒停用）時，盤中檢查仍會執行', async () => {
+  it('每日推播停用時，改由盤中檢查判斷並單獨推一則（同樣只推最接近的）', async () => {
+    const w = createWorld('2026-10-13T13:31:00Z'); // 21:31
+    await w.store.updateSettings({ dailyEnabled: false });
+    for (const targetPrice of [1, 2_000_000, 1_000_000]) {
+      await w.store.insertPriceTarget({ ...MOCK_KEY, direction: 'below', targetPrice, note: null });
+    }
+    const r = await runIntradayJob(w.deps(), { trigger: 'cron' });
+    expect(r.detail).toContain('≤ 1000000，一併關閉 2000000');
+    const pushes = targetPushes(w);
+    expect(pushes).toHaveLength(1);
+    expect(pushes[0].text).toContain('目標價格：1,000,000.00 USD（跌到以下）');
+    expect(pushes[0].text).toContain('同時達到：2,000,000.00 USD');
+    const byPrice = new Map((await w.store.listPriceTargets({ limit: 5 })).map((t) => [t.targetPrice, t]));
+    expect(byPrice.get(1_000_000)?.status).toBe('triggered');
+    expect(byPrice.get(2_000_000)?.status).toBe('triggered');
+    expect(byPrice.get(2_000_000)?.eventId).toBe(byPrice.get(1_000_000)?.eventId);
+    expect(byPrice.get(1)?.status).toBe('active');
+    // 再查一次不會補推被一併關閉的 2,000,000
+    await runIntradayJob(w.deps(), { trigger: 'manual' });
+    expect(targetPushes(w)).toHaveLength(1);
+  });
+
+  it('百分比提醒停用時：每日推播開著就不做盤中檢查；每日推播停用且有到價提醒才會執行', async () => {
     const w = createWorld('2026-10-13T13:31:00Z'); // 21:31
     await w.store.updateSettings({ alertEnabled: false });
-    expect((await runIntradayJob(w.deps(), { trigger: 'cron' })).status).toBe('disabled');
     await w.store.insertPriceTarget({ ...MOCK_KEY, direction: 'below', targetPrice: 1, note: null });
+    expect((await runIntradayJob(w.deps(), { trigger: 'cron' })).status).toBe('disabled');
+    await w.store.updateSettings({ dailyEnabled: false });
     expect((await runIntradayJob(w.deps(), { trigger: 'cron' })).status).toBe('success');
   });
 

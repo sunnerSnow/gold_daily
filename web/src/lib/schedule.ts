@@ -5,14 +5,22 @@ import { parseHhmm, startOfTaipeiDay, taipeiMinutesOfDay, taipeiParts } from './
 
 const DAY_MS = 86_400_000;
 
+/** 台北時間的星期（0 = 週日、6 = 週六） */
+export function taipeiWeekday(date: Date): number {
+  const p = taipeiParts(date);
+  return new Date(Date.UTC(p.year, p.month - 1, p.day)).getUTCDay();
+}
+
 /** 台北時間是否為週六、週日（金市休市） */
 export function isTaipeiWeekend(date: Date): boolean {
-  const p = taipeiParts(date);
-  const weekday = new Date(Date.UTC(p.year, p.month - 1, p.day)).getUTCDay();
+  const weekday = taipeiWeekday(date);
   return weekday === 0 || weekday === 6;
 }
 
-type ScheduleSettings = Pick<SettingsRow, 'intradayMode' | 'checkTimes' | 'pollingIntervalMinutes' | 'skipWeekends' | 'dailyEnabled'>;
+/** 週末不推播但週六推播時，每月大約多幾次週六 */
+export const SATURDAYS_PER_MONTH = 4;
+
+type ScheduleSettings = Pick<SettingsRow, 'intradayMode' | 'checkTimes' | 'pollingIntervalMinutes' | 'skipWeekends' | 'saturdayPush' | 'dailyEnabled'>;
 
 /** 除了每日推播之外，是否還有盤中檢查 */
 export function hasIntradayChecks(s: Pick<SettingsRow, 'intradayMode' | 'checkTimes' | 'pollingIntervalMinutes'>): boolean {
@@ -76,19 +84,24 @@ export function intradayDue(s: ScheduleSettings, now: Date, lastRunAt: Date | nu
   return { due: true, slot };
 }
 
-/** 每日推播今天要不要跑 */
-export function isDailyDay(s: Pick<SettingsRow, 'skipWeekends'>, now: Date): boolean {
-  return !(s.skipWeekends && isTaipeiWeekend(now));
+/** 每日推播今天要不要跑：週末不推播時跳過週日；週六看「週六推播」設定（推週五美國盤的收盤價） */
+export function isDailyDay(s: Pick<SettingsRow, 'skipWeekends' | 'saturdayPush'>, now: Date): boolean {
+  if (!s.skipWeekends) return true;
+  const weekday = taipeiWeekday(now);
+  if (weekday === 0) return false;
+  if (weekday === 6) return s.saturdayPush;
+  return true;
 }
 
 /** 依設定估算每月要查價幾次（給畫面提示額度用） */
 export function estimateMonthlyCalls(s: ScheduleSettings): number {
-  const days = s.skipWeekends ? 22 : 30;
   const daily = s.dailyEnabled ? 1 : 0;
   let extra = 0;
   if (s.intradayMode === 'times') extra = s.checkTimes.length;
   if (s.intradayMode === 'interval' && s.pollingIntervalMinutes > 0) extra = Math.floor((24 * 60) / s.pollingIntervalMinutes);
-  return days * (daily + extra);
+  if (!s.skipWeekends) return 30 * (daily + extra);
+  // 週六只有每日推播，沒有盤中檢查
+  return 22 * (daily + extra) + (s.saturdayPush ? daily * SATURDAYS_PER_MONTH : 0);
 }
 
 /** "09:00, 21:30" → ['09:00', '21:30']；格式錯誤回傳 null */

@@ -71,6 +71,14 @@ export function formatChangeLine(amount: number, percent: number, currency: stri
 
 export const DAILY_TITLE = '💰黃金每日行情';
 
+/** 每日推播裡的到價提醒：一個方向一筆，只列最接近目前價格的目標價，其他同時達到的放在 alsoReached */
+export interface TargetLine {
+  direction: 'above' | 'below';
+  targetPrice: number;
+  alsoReached: number[];
+  note: string | null;
+}
+
 export interface DailyMessageInput {
   price: number;
   symbol: string;
@@ -83,6 +91,17 @@ export interface DailyMessageInput {
   source: string;
   status: QuoteStatus;
   stale: boolean;
+  /** 今天的價格達到的目標價（到價提醒併入每日推播，不另外推） */
+  targets?: TargetLine[];
+}
+
+/** 🎯 已達目標價 3,900.00 USD（跌到以下）＋同時達到、備註 */
+export function formatTargetLines(targets: TargetLine[], currency: string): string[] {
+  return targets.flatMap((t) => [
+    `🎯 已達目標價 ${formatPrice(t.targetPrice)} ${currency}（${t.direction === 'above' ? '漲到以上' : '跌到以下'}）`,
+    ...(t.alsoReached.length > 0 ? [`同時達到：${t.alsoReached.map((p) => formatPrice(p)).join('、')} ${currency}`] : []),
+    ...(t.note ? [`備註：${t.note}`] : []),
+  ]);
 }
 
 /** 每日訊息的欄位（純文字與卡片共用，數字只算一次） */
@@ -100,6 +119,8 @@ export interface DailyFields {
   rows: [label: string, value: string][];
   /** 過期或異常（畫面與卡片要醒目標示） */
   warning: boolean;
+  /** 到價提醒（第一行是「🎯 已達目標價…」）；沒有到價時是空陣列 */
+  targetLines: string[];
 }
 
 export function dailyFields(i: DailyMessageInput): DailyFields {
@@ -108,7 +129,7 @@ export function dailyFields(i: DailyMessageInput): DailyFields {
   const date = validTime ? formatDateLabel(taipeiDate(i.timestamp)) : null;
   const source: [string, string] = ['資料來源', describeSource(i.source, i.status)];
   if (!isValidPrice(i.price) || !validTime) {
-    return { valid: false, title, date, instrument: '', price: NO_DATA, unit: '', change: null, tone: null, rows: [source, ['資料狀態', '異常（報價無效）']], warning: true };
+    return { valid: false, title, date, instrument: '', price: NO_DATA, unit: '', change: null, tone: null, rows: [source, ['資料狀態', '異常（報價無效）']], warning: true, targetLines: [] };
   }
   const hasChange = isValidPrice(i.referencePrice) && isFiniteNumber(i.changeAmount) && isFiniteNumber(i.changePercent);
   return {
@@ -127,6 +148,7 @@ export function dailyFields(i: DailyMessageInput): DailyFields {
       ['資料狀態', describeDataStatus(i)],
     ],
     warning: i.stale,
+    targetLines: formatTargetLines(i.targets ?? [], i.currency),
   };
 }
 
@@ -138,6 +160,7 @@ export function formatDailyMessage(i: DailyMessageInput): string {
   } else {
     lines.push(f.instrument, `${f.price} ${f.unit}`);
     if (f.change) lines.push('', f.change);
+    if (f.targetLines.length > 0) lines.push('', ...f.targetLines);
   }
   lines.push('', ...f.rows.map(([label, value]) => `${label}：${value}`), '', ...CHART_LINK);
   return lines.join('\n');

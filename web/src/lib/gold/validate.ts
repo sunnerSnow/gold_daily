@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { taipeiParts } from '../time';
 import type { GoldQuote, Instrument } from './types';
 
 // 驗證 Provider 回傳的報價：價格、時間戳、商品代號、幣別、單位都要對得上。
@@ -47,9 +48,25 @@ export function validateQuote(raw: unknown, expected: Instrument): QuoteValidati
   return { ok: true, quote: q };
 }
 
-/** 報價是否已過期（行情來源沒有更新） */
+/** 報價是否已過期（行情來源沒有更新）；週六拿到的當週收盤價不算過期 */
 export function isStale(quoteTimestamp: Date, now: Date, staleAfterMinutes: number): boolean {
+  if (isSaturdayClose(quoteTimestamp, now)) return false;
   return now.getTime() - quoteTimestamp.getTime() > staleAfterMinutes * 60 * 1000;
+}
+
+/**
+ * 週六的當週收盤價。國際金價在台北時間週六清晨收盤（夏令約 05:00、冬令約 06:00），到週一清晨開盤前都不會更新。
+ * 週六當天拿到的是當天清晨的收盤價（週五美國盤的結果），雖然超過過期門檻，仍是有效、而且是新的價格。
+ * 條件只看「報價時間是週六當天」：各家行情來源週末回傳的時間戳不一定剛好是收盤那一刻，
+ * 卡太嚴會讓週六推播整則變成「報價過期」；報價時間本來就會顯示在訊息上。
+ * 週五（含）以前的報價、或週日拿到的同一筆價格都算過期（沒有新資訊）。
+ */
+export function isSaturdayClose(quoteTimestamp: Date, now: Date): boolean {
+  if (quoteTimestamp.getTime() > now.getTime()) return false;
+  const q = taipeiParts(quoteTimestamp);
+  const n = taipeiParts(now);
+  const saturday = new Date(Date.UTC(n.year, n.month - 1, n.day)).getUTCDay() === 6;
+  return saturday && q.year === n.year && q.month === n.month && q.day === n.day;
 }
 
 /** 兩筆報價是否來自同一個商品與來源，可以互相比較 */

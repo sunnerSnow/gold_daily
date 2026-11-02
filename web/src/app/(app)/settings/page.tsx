@@ -84,8 +84,11 @@ export default async function SettingsPage() {
   const SUBSCRIBER_STATUS = { active: ['chip--ok', '訂閱中'], stopped: ['chip--muted', '已取消'], blocked: ['chip--warn', '無法傳送'] } as const;
 
   const quota = data.provider.monthlyCallQuota;
+  // 到價提醒平常併入每日推播（指向 daily 事件），每日推播停用時才是單獨的 target 事件
   const targetEvents = new Map(
-    (await deps.store.listEvents({ types: ['target'], limit: 50 })).map((e) => [e.id, describeEvent(e)] as const),
+    (await deps.store.listEvents({ types: ['target', 'daily'], limit: 80 })).map(
+      (e) => [e.id, e.eventType === 'daily' ? `併入每日推播・${describeEvent(e)}` : describeEvent(e)] as const,
+    ),
   );
   const toView = (t: (typeof data.targets)[number]): TargetView => ({
     id: t.id,
@@ -98,12 +101,13 @@ export default async function SettingsPage() {
     triggeredPrice: t.triggeredPrice,
     eventLabel: t.eventId ? targetEvents.get(t.eventId) ?? null : null,
   });
-  const checkSummary =
-    s.intradayMode === 'times'
-      ? `目前在每日推播（${s.dailyPushTime}）與 ${s.checkTimes.join('、')} 檢查。`
+  const checkSummary = s.dailyEnabled
+    ? `每天 ${s.dailyPushTime} 每日推播時用當天的價格判斷，達到的目標價寫在那則每日行情裡，不另外推。`
+    : s.intradayMode === 'times'
+      ? `每日推播已停用，改在盤中檢查（${s.checkTimes.join('、')}）判斷，達到時單獨推一則。`
       : s.intradayMode === 'interval'
-        ? `目前在每日推播與每 ${s.pollingIntervalMinutes} 分鐘檢查。`
-        : `目前只在每日推播（${s.dailyPushTime}）時檢查。`;
+        ? `每日推播已停用，改在盤中檢查（每 ${s.pollingIntervalMinutes} 分鐘）判斷，達到時單獨推一則。`
+        : '每日推播與盤中檢查都已停用，目前不會判斷到價。';
 
   return (
     <>
@@ -124,6 +128,7 @@ export default async function SettingsPage() {
               checkTimes: s.checkTimes.join(', '),
               pollingIntervalMinutes: s.pollingIntervalMinutes,
               skipWeekends: s.skipWeekends,
+              saturdayPush: s.saturdayPush,
               cooldownMinutes: s.cooldownMinutes,
               baselineMode: s.baselineMode,
               manualBaselinePrice: s.baselineMode === 'manual' && s.baselinePrice ? String(s.baselinePrice) : '',

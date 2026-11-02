@@ -15,6 +15,7 @@ export interface SettingsFormValues {
   checkTimes: string;
   pollingIntervalMinutes: 0 | 15 | 30 | 60;
   skipWeekends: boolean;
+  saturdayPush: boolean;
   cooldownMinutes: number;
   baselineMode: 'first_valid_of_day' | 'previous_close' | 'manual';
   manualBaselinePrice: string;
@@ -55,13 +56,15 @@ export interface ProviderQuotaInfo {
   cap: number | null;
 }
 
-/** 依設定估算每月查價次數（與 lib/schedule.ts 的 estimateMonthlyCalls 相同算法） */
-function estimateCalls(daily: boolean, mode: string, times: string, interval: string, skipWeekends: boolean): number {
+/** 依設定估算每月查價次數（與 lib/schedule.ts 的 estimateMonthlyCalls 相同算法；週六只有每日推播，約 4 次） */
+function estimateCalls(daily: boolean, mode: string, times: string, interval: string, skipWeekends: boolean, saturdayPush: boolean) {
   const days = skipWeekends ? 22 : 30;
   let extra = 0;
   if (mode === 'times') extra = times.split(/[,，、\s]+/).filter((t) => /^\d{1,2}:\d{2}$/.test(t.trim())).length;
   if (mode === 'interval') extra = Math.floor((24 * 60) / Number(interval || 15));
-  return days * ((daily ? 1 : 0) + extra);
+  const perDay = (daily ? 1 : 0) + extra;
+  const saturdays = skipWeekends && saturdayPush && daily ? 4 : 0;
+  return { total: days * perDay + saturdays, days, perDay, saturdays };
 }
 
 export function SettingsForm({
@@ -83,13 +86,15 @@ export function SettingsForm({
   const [checkTimes, setCheckTimes] = useState(initial.checkTimes);
   const [polling, setPolling] = useState(String(initial.pollingIntervalMinutes || 15));
   const [skipWeekends, setSkipWeekends] = useState(initial.skipWeekends);
+  const [saturdayPush, setSaturdayPush] = useState(initial.saturdayPush);
   const [mode, setMode] = useState(initial.baselineMode);
   const [cooldown, setCooldown] = useState(String(initial.cooldownMinutes));
   const [quota, setQuota] = useState(String(initial.monthlyMessageQuota));
   const err = state?.fieldErrors ?? {};
   const invalid = (k: string) => (err[k] ? true : undefined);
 
-  const estimate = estimateCalls(dailyOn, intradayMode, checkTimes, polling, skipWeekends);
+  const est = estimateCalls(dailyOn, intradayMode, checkTimes, polling, skipWeekends, saturdayPush);
+  const estimate = est.total;
   const overBudget = provider.cap !== null && estimate > provider.cap;
 
   const cooldownHint = (() => {
@@ -152,7 +157,18 @@ export function SettingsForm({
           </span>
           <Switch name="skipWeekends" checked={skipWeekends} onChange={setSkipWeekends} labelledBy="weekend-label" />
         </div>
-        <p className="help">每日推播時會查一次價；下面設定的是推播以外的盤中檢查。百分比提醒與到價提醒都在這些時間判斷。</p>
+        {skipWeekends ? (
+          <div className="inset" style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+            <span className="small" id="saturday-label">
+              <b>週六照常每日推播</b>
+              <span className="cell-note">
+                國際金價在台北時間週六清晨收盤，週五晚上美國盤的走勢要到週六早上才看得到。開啟後週六也送每日推播（當週收盤價），週日不推；週末不做盤中檢查。每月約多 4 次推播。
+              </span>
+            </span>
+            <Switch name="saturdayPush" checked={saturdayPush} onChange={setSaturdayPush} labelledBy="saturday-label" />
+          </div>
+        ) : null}
+        <p className="help">每日推播時會查一次價；下面設定的是推播以外的盤中檢查。百分比提醒在這些時間判斷；到價提醒只在每日推播時用當天的價格判斷（每日推播停用時才改在這些時間判斷）。</p>
         <fieldset className="plain-fieldset" style={{ gap: 12 }}>
           <legend>盤中檢查</legend>
           <div className="radio-list">
@@ -199,7 +215,7 @@ export function SettingsForm({
         </fieldset>
         <div className={`note${overBudget ? ' note--warn' : ''}`}>
           <span>
-            預估每月查價約 <b className="num">{estimate}</b> 次（約 {skipWeekends ? '22 個交易日' : '30 天'} × 每天 {estimate / (skipWeekends ? 22 : 30)} 次）。
+            預估每月查價約 <b className="num">{estimate}</b> 次（約 {skipWeekends ? '22 個交易日' : '30 天'} × 每天 {est.perDay} 次{est.saturdays ? `＋週六 ${est.saturdays} 次` : ''}）。
             {provider.monthlyQuota !== null
               ? overBudget
                 ? ` 超過 ${provider.name} 免費額度可用的 ${provider.cap} 次；超過時系統會停止盤中檢查，但保留每日推播。`
@@ -367,7 +383,7 @@ export function SettingsForm({
       <div className="card card--tight" style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between' }}>
         <span className="small soft">上次儲存 <span className="num">{lastSaved}</span></span>
         <div className="btn-row">
-          <button type="reset" className="btn" onClick={() => { setDailyOn(initial.dailyEnabled); setAlertOn(initial.alertEnabled); setIntradayMode(initial.intradayMode); setCheckTimes(initial.checkTimes); setSkipWeekends(initial.skipWeekends); setPolling(String(initial.pollingIntervalMinutes || 15)); setMode(initial.baselineMode); setCooldown(String(initial.cooldownMinutes)); setQuota(String(initial.monthlyMessageQuota)); }}>
+          <button type="reset" className="btn" onClick={() => { setDailyOn(initial.dailyEnabled); setAlertOn(initial.alertEnabled); setIntradayMode(initial.intradayMode); setCheckTimes(initial.checkTimes); setSkipWeekends(initial.skipWeekends); setSaturdayPush(initial.saturdayPush); setPolling(String(initial.pollingIntervalMinutes || 15)); setMode(initial.baselineMode); setCooldown(String(initial.cooldownMinutes)); setQuota(String(initial.monthlyMessageQuota)); }}>
             還原變更
           </button>
           <button type="submit" className="btn btn--primary" disabled={pending}>{pending ? '儲存中…' : '儲存設定'}</button>

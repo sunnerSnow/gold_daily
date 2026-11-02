@@ -308,7 +308,7 @@ export class MemoryStore implements Store {
       .map((t) => ({ ...t }));
   }
 
-  async triggerPriceTarget(id: number, fields: { triggeredAt: Date; triggeredPrice: number; triggeredQuoteAt: Date }) {
+  async triggerPriceTarget(id: number, fields: { triggeredAt: Date; triggeredPrice: number; triggeredQuoteAt: Date; eventId?: number }) {
     const row = this.targets.find((t) => t.id === id);
     if (!row || row.status !== 'active') return null;
     Object.assign(row, fields, { status: 'triggered' as const });

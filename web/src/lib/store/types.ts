@@ -42,6 +42,8 @@ export interface SettingsRow {
   pollingIntervalMinutes: PollingInterval;
   /** 週末（休市）不推播、不查價 */
   skipWeekends: boolean;
+  /** 週末不推播時，週六仍送每日推播（週五美國盤的收盤價）；週日照樣不推 */
+  saturdayPush: boolean;
   cooldownMinutes: number;
   baselineMode: BaselineMode;
   baselinePrice: number | null;
@@ -259,8 +261,14 @@ export interface Store {
 
   insertPriceTarget(input: NewPriceTarget): Promise<PriceTargetRow>;
   listPriceTargets(options: { statuses?: TargetStatus[]; limit: number }): Promise<PriceTargetRow[]>;
-  /** 只在目標價仍是 active 時改成 triggered（原子操作）；已被觸發或取消則回傳 null */
-  triggerPriceTarget(id: number, fields: { triggeredAt: Date; triggeredPrice: number; triggeredQuoteAt: Date }): Promise<PriceTargetRow | null>;
+  /**
+   * 只在目標價仍是 active 時改成 triggered（原子操作）；已被觸發或取消則回傳 null。
+   * 已經有通知它的事件時（例如併入每日推播）一併寫入 eventId，關閉與指向事件在同一次更新完成。
+   */
+  triggerPriceTarget(
+    id: number,
+    fields: { triggeredAt: Date; triggeredPrice: number; triggeredQuoteAt: Date; eventId?: number },
+  ): Promise<PriceTargetRow | null>;
   updatePriceTarget(id: number, patch: Partial<Pick<PriceTargetRow, 'status' | 'eventId' | 'triggeredAt' | 'triggeredPrice' | 'triggeredQuoteAt'>>): Promise<PriceTargetRow>;
 
   /** 每次呼叫行情 API 前記一筆，回傳紀錄 id */
@@ -287,6 +295,7 @@ export const DEFAULT_SETTINGS: Omit<SettingsRow, 'createdAt' | 'updatedAt'> = {
   checkTimes: ['21:30'],
   pollingIntervalMinutes: 15,
   skipWeekends: true,
+  saturdayPush: true,
   cooldownMinutes: 240,
   baselineMode: 'first_valid_of_day',
   baselinePrice: null,

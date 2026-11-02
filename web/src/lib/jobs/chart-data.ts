@@ -6,8 +6,12 @@ import type { InstrumentKey, SnapshotRow } from '../store/types';
 import type { TelegramMessage } from '../telegram/client';
 import { buildDailyTelegram } from '../telegram/format';
 import type { JobDeps } from './deps';
+import { targetLinesForEvent } from './target-hits';
 
 // 走勢圖、每日卡片與每日訊息預覽用的資料。只讀資料庫裡的每日快照，不呼叫行情來源。
+
+/** 每日推播事件的鍵：同一天只會有一則 */
+export const dailyKey = (date: string) => `daily:${date}`;
 
 function currentInstrument(deps: JobDeps): InstrumentKey | null {
   const instrument = deps.provider.getProviderStatus().instrument;
@@ -41,7 +45,7 @@ export async function dailyChartUrl(deps: JobDeps, date: string): Promise<string
 }
 
 /**
- * 從資料庫重建某天的每日訊息資料：那天的每日快照＋前一筆每日快照。
+ * 從資料庫重建某天的每日訊息資料：那天的每日快照＋前一筆每日快照＋那天併入每日推播的到價提醒。
  * 跟每日排程產生訊息時用的是同一組資料（findReference 也是取前一筆每日快照），所以補送、重試的數字跟原本一樣。
  * 每日快照只會由有效（未過期）的報價寫入，所以這裡一律不是過期資料。
  */
@@ -50,7 +54,11 @@ export async function dailyMessageInput(deps: JobDeps, date: string): Promise<{ 
   if (!instrument) return null;
   const snapshot = await deps.store.getDailySnapshot(instrument, date);
   if (!snapshot) return null;
-  const prev = await deps.store.getPreviousDailySnapshot(instrument, date);
+  const [prev, event] = await Promise.all([
+    deps.store.getPreviousDailySnapshot(instrument, date),
+    deps.store.getEventByKey(dailyKey(date)),
+  ]);
+  const targets = event ? await targetLinesForEvent(deps, event.id) : [];
   const change = computeChange(snapshot.price, prev?.price);
   return {
     snapshot,
@@ -66,6 +74,7 @@ export async function dailyMessageInput(deps: JobDeps, date: string): Promise<{ 
       source: snapshot.source,
       status: snapshot.status,
       stale: false,
+      targets,
     },
   };
 }

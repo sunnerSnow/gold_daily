@@ -203,7 +203,7 @@ function Dashboard({ data }: { data: DashboardData }) {
             {data.alerts.length === 0 ? (
               <div className="empty">
                 <span className="empty__title">尚無異動事件</span>
-                <span className="empty__text">價格漲跌達到門檻、或到達你設定的目標價時才會產生事件。</span>
+                <span className="empty__text">價格漲跌達到門檻時才會產生事件。到價提醒寫在當天的每日推播裡（每日推播停用時才會單獨列在這裡）。</span>
               </div>
             ) : (
               <div className="table-wrap">

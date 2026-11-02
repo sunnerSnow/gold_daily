@@ -3,7 +3,7 @@ import { computeChange, fallPercent, risePercent } from './math';
 import { MOCK_INSTRUMENT, MockGoldPriceProvider } from './mock-provider';
 import { createProvider } from './registry';
 import { ProviderError } from './types';
-import { isStale, validateQuote } from './validate';
+import { isSaturdayClose, isStale, validateQuote } from './validate';
 
 const NOW = new Date('2026-10-13T02:42:00Z'); // 台北 10:42（週二）
 
@@ -124,10 +124,21 @@ describe('MockGoldPriceProvider', () => {
     expect(isStale(q.timestamp, NOW, 30)).toBe(true);
   });
 
-  it('週末休市時報價停在週六清晨，判定為過期', async () => {
+  it('週末休市時報價停在週六清晨：週日判定為過期', async () => {
     const sunday = new Date('2026-10-18T02:00:00Z'); // 台北週日 10:00
     const q = await new MockGoldPriceProvider({ now: () => sunday }).getLatestPrice();
     expect(isStale(q.timestamp, sunday, 30)).toBe(true);
+  });
+
+  it('週六拿到的是當週收盤價（週五美國盤），雖然超過 30 分鐘沒更新，不算過期', async () => {
+    const saturday = new Date('2026-10-17T01:00:00Z'); // 台北週六 09:00（收盤後約 4 小時）
+    const q = await new MockGoldPriceProvider({ now: () => saturday }).getLatestPrice();
+    expect(isSaturdayClose(q.timestamp, saturday)).toBe(true);
+    expect(isStale(q.timestamp, saturday, 30)).toBe(false);
+    // 停在週五的報價（週五美國盤還沒收盤前就卡住）不是收盤價，仍算過期
+    expect(isStale(new Date('2026-10-16T15:00:00Z'), saturday, 30)).toBe(true); // 週五 23:00
+    // 平日照舊：超過 30 分鐘就過期
+    expect(isSaturdayClose(new Date('2026-10-15T21:00:00Z'), new Date('2026-10-16T01:00:00Z'))).toBe(false);
   });
 
   it('歷史資料只有平日，且不超過現在', async () => {

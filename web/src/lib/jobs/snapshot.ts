@@ -63,7 +63,7 @@ function quoteFromSnapshot(s: SnapshotRow): GoldQuote {
 
 export async function fetchAndRecord(
   deps: JobDeps,
-  settings: Pick<SettingsRow, 'dailyEnabled' | 'skipWeekends'>,
+  settings: Pick<SettingsRow, 'dailyEnabled' | 'skipWeekends' | 'saturdayPush'>,
   purpose: FetchPurpose,
 ): Promise<FetchOutcome> {
   const status = deps.provider.getProviderStatus();

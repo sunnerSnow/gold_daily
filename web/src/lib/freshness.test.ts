@@ -4,9 +4,9 @@ import { MemoryStore } from './store/memory';
 import { DEFAULT_SETTINGS } from './store/types';
 
 // 報價是否還是最新：依查價時間表判斷，兩次查價之間不算過期。
-// 預設：交易日 09:00（每日推播）＋ 21:30（盤中），週末不查價。台北 = UTC+8。
+// 這裡的 s：交易日 09:00（每日推播）＋ 21:30（盤中），週末不查價（週六推播另外測）。台北 = UTC+8。
 
-const s = { ...DEFAULT_SETTINGS };
+const s = { ...DEFAULT_SETTINGS, saturdayPush: false };
 const at = (iso: string) => new Date(iso);
 // 2026-10-15 是週四
 const THU_0900 = '2026-10-15T01:00:02Z';
@@ -69,6 +69,28 @@ describe('報價是否還是最新', () => {
     const q = { quoteTimestamp: at('2026-10-15T02:00:00Z'), fetchedAt: at('2026-10-15T02:00:00Z') };
     expect(assessQuote(q, every15, at('2026-10-15T02:40:00Z'), 30).state).toBe('current');
     expect(assessQuote(q, every15, at('2026-10-15T03:10:00Z'), 30).state).toBe('missed');
+  });
+});
+
+describe('週六推播（週末只有週六 09:00 的每日推播）', () => {
+  const sat = { ...DEFAULT_SETTINGS, saturdayPush: true };
+
+  it('週六只有每日推播，沒有盤中檢查；週日沒有', () => {
+    expect(nextScheduledCheck(sat, at('2026-10-16T14:00:00Z'))?.toISOString()).toBe('2026-10-17T01:00:00.000Z'); // 週五晚上 → 週六 09:00
+    expect(nextScheduledCheck(sat, at('2026-10-17T02:00:00Z'))?.toISOString()).toBe('2026-10-19T01:00:00.000Z'); // 週六 10:00 → 週一 09:00
+    expect(lastScheduledCheck(sat, at('2026-10-18T04:00:00Z'))?.toISOString()).toBe('2026-10-17T01:00:00.000Z'); // 週日 → 週六 09:00
+  });
+
+  it('週六查到的當週收盤價不算來源過期，週日看也是最新', () => {
+    // 收盤在週六 05:00，09:00 才查到（相差 4 小時）
+    const close = { quoteTimestamp: at('2026-10-16T21:00:00Z'), fetchedAt: at('2026-10-17T01:00:05Z') };
+    expect(assessQuote(close, sat, at('2026-10-17T02:00:00Z'), 30)).toEqual({ state: 'current' });
+    expect(assessQuote(close, sat, at('2026-10-18T04:00:00Z'), 30)).toEqual({ state: 'current' });
+  });
+
+  it('週六該推沒推（週日還停在週五的報價）→ 漏查', () => {
+    const fri = { quoteTimestamp: at('2026-10-16T13:30:01Z'), fetchedAt: at('2026-10-16T13:30:01Z') };
+    expect(assessQuote(fri, sat, at('2026-10-18T04:00:00Z'), 30)).toEqual({ state: 'missed', expectedAt: at('2026-10-17T01:00:00Z') });
   });
 });
 

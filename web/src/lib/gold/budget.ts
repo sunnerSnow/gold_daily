@@ -68,9 +68,13 @@ export function startOfUtcMonth(date: Date): Date {
 }
 
 /**
- * 本月（UTC）還會跑幾次每日推播：從今天（若今天還沒跑）到月底，週末不推播時只算平日。
+ * 本月（UTC）還會跑幾次每日推播：從今天（若今天還沒跑）到月底。
+ * 週末不推播時只算平日，開了週六推播再加上週六。
  */
-export function remainingDailyRuns(now: Date, opts: { dailyEnabled: boolean; skipWeekends: boolean; dailyDoneToday: boolean }): number {
+export function remainingDailyRuns(
+  now: Date,
+  opts: { dailyEnabled: boolean; skipWeekends: boolean; saturdayPush: boolean; dailyDoneToday: boolean },
+): number {
   if (!opts.dailyEnabled) return 0;
   const end = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1));
   let count = 0;
@@ -79,7 +83,7 @@ export function remainingDailyRuns(now: Date, opts: { dailyEnabled: boolean; ski
     const isToday = d.getUTCDate() === now.getUTCDate();
     if (isToday && opts.dailyDoneToday) continue;
     const w = d.getUTCDay();
-    if (opts.skipWeekends && (w === 0 || w === 6)) continue;
+    if (opts.skipWeekends && (w === 0 || (w === 6 && !opts.saturdayPush))) continue;
     count += 1;
   }
   return count;

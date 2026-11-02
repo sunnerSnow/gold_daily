@@ -4,7 +4,7 @@ import { startTransition, useActionState, useState } from 'react';
 import { addTargetAction, cancelTargetAction, rearmTargetAction } from '@/app/actions';
 import { ActionButton } from './action-button';
 
-// 到價提醒：價格漲到（或跌到）目標價時送一則 LINE，送出後自動關閉。
+// 到價提醒：價格漲到（或跌到）目標價時通知一次（平常寫在當天的每日推播裡），之後自動關閉。
 
 export interface TargetView {
   id: number;
@@ -47,7 +47,7 @@ export function PriceTargetsCard({
   const preview =
     currentPrice && Number.isFinite(typed) && typed > 0
       ? (direction === 'above' ? typed <= currentPrice : typed >= currentPrice)
-        ? '目前價格已經達到這個目標，下一次查價就會觸發。'
+        ? '目前價格已經達到這個目標，下一次判斷時就會觸發。'
         : `距離目前價格 ${pct(typed, currentPrice)}。`
       : '';
 
@@ -68,7 +68,7 @@ export function PriceTargetsCard({
         ) : null}
       </div>
       <p className="help">
-        價格漲到（或跌到）目標價時送一則 LINE，送出後這個目標價自動關閉。同一次查價有好幾個目標價都達到時，只推最接近目前價格的那一個，其他的一併關閉。{checkSummary}
+        價格漲到（或跌到）目標價時通知一次，之後這個目標價自動關閉，要再提醒請按「重新啟用」。同時達到好幾個目標價時，只列最接近目前價格的那一個，其他的註明「同時達到」並一起關閉。{checkSummary}
       </p>
 
       <form

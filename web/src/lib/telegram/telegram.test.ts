@@ -209,7 +209,8 @@ describe('Telegram 訂閱（webhook）', () => {
     expect(await store.getTelegramSubscriber('5001')).toMatchObject({ status: 'active', name: '小明 王', username: 'ming' });
     const welcome = telegram.sends[0];
     expect(welcome.chatId).toBe('5001');
-    expect(welcome.message.type === 'text' && welcome.message.html).toContain('每個交易日 09:00（台灣時間）');
+    // 預設週末不推播、但週六推播（當週收盤價）
+    expect(welcome.message.type === 'text' && welcome.message.html).toContain('週一到週六 09:00（台灣時間）');
     expect(welcome.message.type === 'text' && welcome.message.html).toContain('不構成投資建議');
     expect(await handleTelegramUpdate(deps, privateMessage('/start'))).toBe('already_subscribed');
     expect(await store.listTelegramSubscribers({ limit: 10 })).toHaveLength(1);

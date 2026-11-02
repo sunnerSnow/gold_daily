@@ -78,6 +78,7 @@ function toSettings(r: Row): SettingsRow {
       .sort(),
     pollingIntervalMinutes: Number(r.polling_interval_minutes) as SettingsRow['pollingIntervalMinutes'],
     skipWeekends: r.skip_weekends === undefined ? true : Boolean(r.skip_weekends),
+    saturdayPush: r.saturday_push === undefined ? true : Boolean(r.saturday_push),
     cooldownMinutes: Number(r.cooldown_minutes),
     baselineMode: r.baseline_mode as SettingsRow['baselineMode'],
     baselinePrice: num(r.baseline_price),
@@ -103,6 +104,7 @@ const SETTINGS_COLUMNS: Record<keyof SettingsPatch, string> = {
   checkTimes: 'check_times',
   pollingIntervalMinutes: 'polling_interval_minutes',
   skipWeekends: 'skip_weekends',
+  saturdayPush: 'saturday_push',
   cooldownMinutes: 'cooldown_minutes',
   baselineMode: 'baseline_mode',
   baselinePrice: 'baseline_price',
@@ -538,7 +540,7 @@ export class SupabaseStore implements Store {
     return (r.data ?? []).map(toTarget);
   }
 
-  async triggerPriceTarget(id: number, fields: { triggeredAt: Date; triggeredPrice: number; triggeredQuoteAt: Date }) {
+  async triggerPriceTarget(id: number, fields: { triggeredAt: Date; triggeredPrice: number; triggeredQuoteAt: Date; eventId?: number }) {
     const r = await this.db
       .from('price_targets')
       .update({
@@ -546,6 +548,7 @@ export class SupabaseStore implements Store {
         triggered_at: fields.triggeredAt.toISOString(),
         triggered_price: fields.triggeredPrice,
         triggered_quote_at: fields.triggeredQuoteAt.toISOString(),
+        ...(fields.eventId !== undefined ? { event_id: fields.eventId } : {}),
       })
       .eq('id', id)
       .eq('status', 'active')

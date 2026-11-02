@@ -41,6 +41,7 @@ export function dailyCaption(i: DailyMessageInput): string | null {
     escapeHtml(f.instrument),
     `<b>${escapeHtml(f.price)}</b> ${escapeHtml(f.unit)}`,
     ...(f.change ? [`<b>${escapeHtml(f.change)}</b>`] : []),
+    ...(f.targetLines.length > 0 ? ['', ...f.targetLines.map((l) => (l.startsWith('🎯') ? `<b>${escapeHtml(l)}</b>` : escapeHtml(l)))] : []),
     '',
     ...f.rows.map(row),
   ].join('\n');
@@ -69,11 +70,12 @@ export function buildTestTelegram(now: Date, daily: TelegramMessage | null): Tel
 
 const DISCLAIMER = '價格僅供參考，不構成投資建議。';
 
-export function welcomeText(settings: Pick<SettingsRow, 'dailyPushTime' | 'skipWeekends'>, alreadyActive: boolean): string {
+export function welcomeText(settings: Pick<SettingsRow, 'dailyPushTime' | 'skipWeekends' | 'saturdayPush'>, alreadyActive: boolean): string {
   if (alreadyActive) return ['<b>你已經訂閱了</b>', '不用再按一次。傳 /stop 可以取消訂閱。'].join('\n');
+  const days = !settings.skipWeekends ? '每天' : settings.saturdayPush ? '週一到週六' : '每個交易日';
   return [
     '<b>✅ 已訂閱 Gold Daily</b>',
-    `${settings.skipWeekends ? '每個交易日' : '每天'} ${settings.dailyPushTime}（台灣時間）會收到國際金價的每日行情（價格、漲跌與走勢圖），價格大幅變動或到達目標價時也會通知你。`,
+    `${days} ${settings.dailyPushTime}（台灣時間）會收到國際金價的每日行情（價格、漲跌與走勢圖），價格大幅變動或到達目標價時也會通知你。`,
     '',
     '傳 /stop 可以隨時取消訂閱。',
     DISCLAIMER,

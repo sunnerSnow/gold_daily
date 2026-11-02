@@ -58,6 +58,21 @@ export function buildDailyCard(i: DailyMessageInput, chartUrl: string | null): F
         contents: [text(f.price, { size: 'xxl', weight: 'bold', color: COLOR.ink, flex: 0 }), text(f.unit, { size: 'sm', color: COLOR.ink3, margin: 'md' })],
       },
       ...(f.change ? [text(f.change, { size: 'md', weight: 'bold', color: toneColor, margin: 'sm' })] : []),
+      ...(f.targetLines.length > 0
+        ? [
+            {
+              type: 'box',
+              layout: 'vertical',
+              spacing: 'xs',
+              margin: 'lg',
+              contents: f.targetLines.map((line) =>
+                line.startsWith('🎯')
+                  ? text(line, { size: 'sm', weight: 'bold', color: COLOR.link, wrap: true })
+                  : text(line, { size: 'sm', color: COLOR.ink2, wrap: true }),
+              ),
+            },
+          ]
+        : []),
       { type: 'separator', margin: 'xl', color: COLOR.line },
       { type: 'box', layout: 'vertical', spacing: 'sm', margin: 'xl', contents: details },
     ],
@@ -75,7 +90,7 @@ export function buildDailyCard(i: DailyMessageInput, chartUrl: string | null): F
 
   return {
     type: 'flex',
-    altText: `${f.title} ${f.price} ${i.currency}${percent}`,
+    altText: `${f.title} ${f.price} ${i.currency}${percent}${f.targetLines.length > 0 ? '｜🎯 已達目標價' : ''}`,
     contents: {
       type: 'bubble',
       size: 'mega',

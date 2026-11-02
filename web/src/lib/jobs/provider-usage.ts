@@ -7,7 +7,7 @@ import { safeErrorMessage, type JobDeps } from './deps';
 
 export async function getProviderBudget(
   deps: JobDeps,
-  settings: Pick<SettingsRow, 'dailyEnabled' | 'skipWeekends'>,
+  settings: Pick<SettingsRow, 'dailyEnabled' | 'skipWeekends' | 'saturdayPush'>,
 ): Promise<ProviderBudget> {
   const status = deps.provider.getProviderStatus();
   const now = deps.now();
@@ -25,6 +25,7 @@ export async function getProviderBudget(
     remainingDailyRuns: remainingDailyRuns(now, {
       dailyEnabled: settings.dailyEnabled,
       skipWeekends: settings.skipWeekends,
+      saturdayPush: settings.saturdayPush,
       dailyDoneToday,
     }),
   });

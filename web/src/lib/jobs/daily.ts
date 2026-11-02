@@ -4,17 +4,18 @@ import { isDailyDay } from '../schedule';
 import type { EventRow, InstrumentKey, JobTrigger, SettingsRow, SnapshotRow } from '../store/types';
 import { formatAge, parseHhmm, startOfTaipeiDay, taipeiDate, taipeiMinutesOfDay } from '../time';
 import { ensureBaseline, evaluateAndNotify } from './alerts';
-import { buildDailyMessages, dailyChartUrl, dailyMessages, type DailyMessages } from './chart-data';
+import { buildDailyMessages, dailyChartUrl, dailyKey, dailyMessages, type DailyMessages } from './chart-data';
 import { safeErrorMessage, type JobDeps, type JobOutcome } from './deps';
 import { CARD_DROPPED_NOTE, deliverEvent, deliveryFailure, MAX_TOTAL_ATTEMPTS, PHOTO_DROPPED_NOTE, RECOVERABLE_SKIPS } from './notify';
 import { getProviderBudget, meteredCall } from './provider-usage';
 import { fetchAndRecord } from './snapshot';
-import { describeTargetHit, evaluateTargets } from './targets';
+import { describeTargetHit, findTargetHits, toTargetLines, triggerTargetHits, type TargetHit } from './target-hits';
+import { evaluateTargets } from './targets';
 
 // 每日行情：取得報價 → 驗證 → 存快照 → 找前一交易日參考價 → 計算漲跌 → 推播 → 記錄結果。
 // 同一天重跑不會產生第二筆每日快照，也不會重複推播（事件鍵 daily:YYYY-MM-DD）。
 // 今天的訊息已經產生後，補送只會重送同一則訊息，不會再查價（避免用掉行情 API 的次數）。
-// 每日查價同時也是一次異動提醒與到價提醒的檢查。
+// 到價提醒用今天的價格判斷，達到的目標價寫在這則每日行情裡，不另外推；每日查價同時也是一次異動提醒的檢查。
 
 const LOCK_TTL_SECONDS = 120;
 /** sending 狀態超過這個時間沒更新，視為上次執行中斷，可以重送（沿用 retry key，不會重複） */
@@ -23,8 +24,6 @@ const STUCK_SENDING_MS = 2 * 60_000;
 const QUOTA_RECHECK_MS = 60 * 60_000;
 /** 同一天最多嘗試幾次取得報價（行情來源中斷時避免一直呼叫） */
 const MAX_FETCH_FAILURES_PER_DAY = 3;
-
-export const dailyKey = (date: string) => `daily:${date}`;
 
 interface DeliveryOptions {
   lineConfigured: boolean;
@@ -179,6 +178,8 @@ export async function runDailyJob(deps: JobDeps, options: DailyOptions): Promise
     const reference = await findReference(deps, settings, instrument, today);
     const price = daily?.price ?? quote.price;
     const change = computeChange(price, reference?.price);
+    // 到價提醒用今天的價格判斷，寫進這則每日行情（過期報價不判斷；每日推播停用時改在後面單獨推）
+    const targetHits: TargetHit[] = settings.dailyEnabled && !stale ? await findTargetHits(deps, price, instrument) : [];
     const messageInput: DailyMessageInput = {
       price,
       symbol: quote.symbol,
@@ -191,6 +192,7 @@ export async function runDailyJob(deps: JobDeps, options: DailyOptions): Promise
       source: quote.source,
       status: quote.status,
       stale,
+      targets: toTargetLines(targetHits),
     };
     // 純文字存在事件上（紀錄、補送失敗時的備案）；實際推播送卡片，兩者用同一組資料
     const messageText = formatDailyMessage(messageInput);
@@ -220,6 +222,13 @@ export async function runDailyJob(deps: JobDeps, options: DailyOptions): Promise
         messageText,
       });
       let event = inserted;
+      // 先建好事件，關閉目標價時一併指向它（同一次更新）：發送失敗時補送、重試會從資料庫重建同樣的到價段落
+      const closed = await triggerTargetHits(deps, targetHits, {
+        triggeredAt: now,
+        triggeredPrice: price,
+        triggeredQuoteAt: messageInput.timestamp,
+        eventId: event.id,
+      });
       let built: DailyMessages | null = null;
       if (needsDelivery(event, now, { ...channels, force })) {
         // 過期報價沒有寫入當天的每日快照：不做卡片（補送時也重建不出來），改送純文字
@@ -228,10 +237,11 @@ export async function runDailyJob(deps: JobDeps, options: DailyOptions): Promise
       }
       eventIds.push(event.id);
       detailParts.push(`推播 ${dailyKey(today)}：${describeEvent(event, built)}`);
+      for (const hit of closed) detailParts.push(`到價提醒（${describeTargetHit(hit)}）併入每日推播`);
       deliveryError = deliveryFailure(event);
     }
 
-    // 每日查價也是一次異動提醒與到價提醒的檢查（過期報價不判斷）
+    // 每日查價也是一次異動提醒的檢查（過期報價不判斷）
     if (!stale) {
       const fresh = await deps.store.getSettings();
       const baseline = await ensureBaseline(deps, fresh, instrument);
@@ -242,9 +252,12 @@ export async function runDailyJob(deps: JobDeps, options: DailyOptions): Promise
           if (!alert.suppressed) detailParts.push(`${alert.decision.trigger && alert.decision.direction === 'up' ? '上漲' : '下跌'}提醒：${describeEvent(alert.event)}`);
         }
       }
-      for (const t of await evaluateTargets(deps, fresh, quote, instrument)) {
-        eventIds.push(t.event.id);
-        detailParts.push(`到價提醒（${describeTargetHit(t)}）：${describeEvent(t.event)}`);
+      // 每日推播停用（手動執行只記錄快照）時，到價提醒沒有每日行情可以併入，單獨推一則
+      if (!settings.dailyEnabled) {
+        for (const t of await evaluateTargets(deps, fresh, quote, instrument)) {
+          eventIds.push(t.event.id);
+          detailParts.push(`到價提醒（${describeTargetHit(t)}）：${describeEvent(t.event)}`);
+        }
       }
     }
 

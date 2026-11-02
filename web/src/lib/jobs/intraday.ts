@@ -5,21 +5,23 @@ import { ensureBaseline, evaluateAndNotify } from './alerts';
 import { safeErrorMessage, type JobDeps, type JobOutcome } from './deps';
 import { describeEvent } from './daily';
 import { fetchAndRecord } from './snapshot';
-import { describeTargetHit, evaluateTargets } from './targets';
+import { describeTargetHit } from './target-hits';
+import { evaluateTargets } from './targets';
 
 // 盤中檢查：跟每日推播是不同的工作。排程每 15 分鐘呼叫一次，這裡依設定（固定時間或固定間隔）
-// 決定要不要真的查價；查到的價格同時判斷百分比異動提醒與到價提醒。
+// 決定要不要真的查價；查到的價格判斷百分比異動提醒。
+// 到價提醒平常併入每日推播（用當天的價格判斷），這裡不判斷；只有每日推播停用時才由盤中檢查判斷並單獨推送。
 
 const LOCK_TTL_SECONDS = 120;
 
 export async function runIntradayJob(deps: JobDeps, options: { trigger: JobTrigger }): Promise<JobOutcome> {
   const now = deps.now();
   const settings = await deps.store.getSettings();
-  const activeTargets = await deps.store.listPriceTargets({ statuses: ['active'], limit: 1 });
+  const checksTargets = !settings.dailyEnabled && (await deps.store.listPriceTargets({ statuses: ['active'], limit: 1 })).length > 0;
 
   if (options.trigger === 'cron') {
-    if (!settings.alertEnabled && activeTargets.length === 0) {
-      return { status: 'disabled', detail: '異動提醒已停用，也沒有到價提醒' };
+    if (!settings.alertEnabled && !checksTargets) {
+      return { status: 'disabled', detail: settings.dailyEnabled ? '異動提醒已停用（到價提醒在每日推播時判斷）' : '異動提醒已停用，也沒有到價提醒' };
     }
     const last = await deps.store.getLastJobRun('intraday', ['success', 'skipped', 'failed']);
     const due = intradayDue(settings, now, last?.startedAt ?? null);
@@ -72,9 +74,12 @@ export async function runIntradayJob(deps: JobDeps, options: { trigger: JobTrigg
       }
     }
 
-    for (const t of await evaluateTargets(deps, settings, quote, instrument)) {
-      eventIds.push(t.event.id);
-      parts.push(`到價提醒（${describeTargetHit(t)}）：${describeEvent(t.event)}`);
+    // 每日推播停用時才在這裡判斷到價（平常併入每日推播）
+    if (!settings.dailyEnabled) {
+      for (const t of await evaluateTargets(deps, settings, quote, instrument)) {
+        eventIds.push(t.event.id);
+        parts.push(`到價提醒（${describeTargetHit(t)}）：${describeEvent(t.event)}`);
+      }
     }
 
     const detail = parts.join('；');
